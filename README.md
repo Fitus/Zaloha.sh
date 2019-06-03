@@ -2,10 +2,11 @@
 
 Zaloha is a shellscript for synchronization of files and directories. It is a much simpler alternative to RSYNC, with key differences:
 
- * Zaloha is a bash shellscript that uses only FIND, SORT and AWK. All you need is the Zaloha.sh file (size is only ~87 kBytes).
- * Documentation is contained in the Zaloha.sh file as well (first ~31 kBytes of the file).
+ * Zaloha is a bash shellscript that uses only FIND, SORT and AWK.
+ * All you need is the Zaloha.sh file (size is only ~87 kBytes).
+ * Documentation is contained in Zaloha.sh as well (first ~31 kBytes of the file).
  * No installation is required.
- * Both <sourceDir> and <backupDir> must be available locally (local HDD/SSD, flash drive, mounted Samba or NFS volume).
+ * Both directories must be available locally (local HDD/SSD, flash drive, mounted Samba or NFS volume).
  * Zaloha does not lock files while copying them. No writing on either directory may occur while Zaloha runs.
  * Zaloha always copies whole files (not parts of files like RSYNC). This is, however, fully sufficient in many situations.
  * Zaloha has optional reverse-synchronization features (details in docu).
