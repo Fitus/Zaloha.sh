@@ -346,8 +346,7 @@ This can be activated via the "--ok3600s" option.
 
 <backupDir> can be a subdirectory of <sourceDir> or vice versa. In such cases, conditions to avoid recursive copying must be passed in via <findGeneralOps>.
 
-The sorting order of the internally used SORT commands is influenced by locale (environment variable LC_COLLATE, or LC_ALL). However, the only requirements of Zaloha
-are that equal values are adjacent in the sorted output and shorter matching substrings (parent directories) come first, and this should be fulfilled in any case.
+The SORT commands are run under the LC_ALL=C environment variable, to avoid a problem caused by some locales that ignore slashes and other punctuations during sorting.
 
 In some situations (e.g. Linux Samba + Linux Samba client), cp --preserve=timestamps does not preserve modification timestamps (unless on empty files).
 In that case, Zaloha should be instructed (via the "--touch" option) to use subsequent touch commands instead, which is a more robust solution.
@@ -861,7 +860,7 @@ BEGIN {
   gsub( /TRIPLET/, "\"///\"" )
   gsub( /QUOTEREGEX/, "/'/" )
   gsub( /QUOTEESC/, "\"'\\\"'\\\"'\"" )
-  gsub( /NUMBERREGEX/, "/^[0-9]+$/" )
+  gsub( /NUMBERREGEX/, "/^[0123456789]+$/" )
   gsub( /ZEROREGEX/, "/^0+$/" )
   gsub( /CNTRLREGEX/, "/[[:cntrl:]]/" )
   gsub( /TERMNORM/, "\"\\033[0m\"" )
@@ -1230,7 +1229,7 @@ if [ ${hLinks} -eq 1 ]; then
 
   start_progress "Sorting (1)"
 
-  sort -t "${FSTAB}" -k7,7 -k8,8 -k13,13 "${f330}" > "${f350}"
+  LC_ALL=C sort -t "${FSTAB}" -k7,7 -k8,8 -k13,13 "${f330}" > "${f350}"
 
   stop_progress
 
@@ -1491,7 +1490,7 @@ AWKDIFF
 
 start_progress "Sorting (2)"
 
-sort -t "${FSTAB}" -k13,13 -k2,2 "${fAfterHLinks}" "${f340}" > "${f370}"
+LC_ALL=C sort -t "${FSTAB}" -k13,13 -k2,2 "${fAfterHLinks}" "${f340}" > "${f370}"
 
 stop_progress
 
@@ -1556,7 +1555,7 @@ AWKPOSTPROC
 
 start_progress "Sorting (3)"
 
-sort -t "${FSTAB}" -k13r,13 "${f380}" > "${f390}"
+LC_ALL=C sort -t "${FSTAB}" -k13r,13 "${f380}" > "${f390}"
 
 stop_progress
 
@@ -1594,7 +1593,7 @@ AWKSELECT23
 
 start_progress "Sorting (4)"
 
-sort -t "${FSTAB}" -k13,13 "${f500}" > "${f505}"
+LC_ALL=C sort -t "${FSTAB}" -k13,13 "${f500}" > "${f505}"
 
 stop_progress
 
