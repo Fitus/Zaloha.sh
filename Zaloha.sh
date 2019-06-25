@@ -264,6 +264,10 @@ Other options are always introduced by a double dash (--), and either have a val
 
 --pRevMode      ... preserve modes (permission bits) during REV operations
 
+--noRestore     ... do not prepare scripts for the case of restore (= saves processing time and disk space, see remarks below)
+
+--optimCSV      ... optimize space occupied by CSV metadata files by removing intermediary CSV files after use (see remarks below)
+
 --noProgress    ... suppress progress messages (less screen output)
 
 --color         ... use color highlighting (can be used on terminals which support ANSI escape codes)
@@ -277,6 +281,13 @@ and they do not contain the "set -e" instruction. Also, the scripts ignore indiv
 a behavior different from the interactive regime, where scripts are traced and halt on the first error.
 
 If both options "--noExec" and "--noProgress" are used, Zaloha does not produce any output on stdout (traditional behavior of Unics tools).
+
+Optimization options "--noRestore" and "--optimCSV": If Zaloha operates on directories with huge numbers of files, especially small ones,
+then the size of metadata plus the size of scripts for the case of restore may exceed the size of the files themselves.
+In such cases, suppressing the preparation of scripts for the case of restore ("--noRestore" option)
+and/or removing of intermediary CSV metadata files after use ("--optimCSV" option) bring relief.
+The scripts for the case of restore can still be produced ex-post by manually running the respective AWK program (700 file) on the source CSV file (505 file).
+If intermediary CSV metadata files are removed, an ex-post analysis of eventual problems may be impossible.
 
 Zaloha must be run by a user with sufficient privileges to read <sourceDir> and to write and perform other required actions on <backupDir>.
 In case of the REV actions, privileges to write and perform other required actions on <sourceDir> are required as well.
@@ -523,6 +534,12 @@ function stop_progress {
   fi
 }
 
+function optim_csv_after_use {
+  if [ ${optimCSV} -eq 1 ]; then
+    rm -f "${1}"
+  fi
+}
+
 TAB=$'\t'
 NLINE=$'\n'
 BSLASHPATTERN="\\\\"
@@ -568,6 +585,8 @@ pMode=0
 pRevUser=0
 pRevGroup=0
 pRevMode=0
+noRestore=0
+optimCSV=0
 noProgress=0
 color=0
 wTest=0
@@ -593,6 +612,8 @@ do
     --pRevUser)          pRevUser=1 ;                     shift ;;
     --pRevGroup)         pRevGroup=1 ;                    shift ;;
     --pRevMode)          pRevMode=1 ;                     shift ;;
+    --noRestore)         noRestore=1 ;                    shift ;;
+    --optimCSV)          optimCSV=1 ;                     shift ;;
     --noProgress)        noProgress=1 ;                   shift ;;
     --color)             color=1 ;                        shift ;;
     --wTest)             wTest=1 ;                        shift ;;
@@ -812,6 +833,8 @@ ${TRIPLET}${FSTAB}pMode${FSTAB}${pMode}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}pRevUser${FSTAB}${pRevUser}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}pRevGroup${FSTAB}${pRevGroup}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}pRevMode${FSTAB}${pRevMode}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noRestore${FSTAB}${noRestore}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}optimCSV${FSTAB}${optimCSV}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}wTest${FSTAB}${wTest}${FSTAB}${TRIPLET}
@@ -1092,7 +1115,11 @@ start_progress "Cleaning"
 
 awk ${awkLint} -f "${f110}" "${f310}" > "${f330}"
 
+optim_csv_after_use "${f310}"
+
 awk ${awkLint} -f "${f110}" "${f320}" > "${f340}"
+
+optim_csv_after_use "${f320}"
 
 stop_progress
 
@@ -1231,11 +1258,15 @@ if [ ${hLinks} -eq 1 ]; then
 
   LC_ALL=C sort -t "${FSTAB}" -k7,7 -k8,8 -k13,13 "${f330}" > "${f350}"
 
+  optim_csv_after_use "${f330}"
+
   stop_progress
 
   start_progress "Hardlinks detecting"
 
   awk ${awkLint} -f "${f150}" "${f350}" > "${f360}"
+
+  optim_csv_after_use "${f350}"
 
   stop_progress
 
@@ -1492,6 +1523,10 @@ start_progress "Sorting (2)"
 
 LC_ALL=C sort -t "${FSTAB}" -k13,13 -k2,2 "${fAfterHLinks}" "${f340}" > "${f370}"
 
+optim_csv_after_use "${fAfterHLinks}"
+
+optim_csv_after_use "${f340}"
+
 stop_progress
 
 start_progress "Differences processing"
@@ -1506,6 +1541,8 @@ awk ${awkLint}                              \
     -v pGroup=${pGroup}                     \
     -v pMode=${pMode}                       \
     "${f300}" "${f370}"                     > "${f380}"
+
+optim_csv_after_use "${f370}"
 
 stop_progress
 
@@ -1557,6 +1594,8 @@ start_progress "Sorting (3)"
 
 LC_ALL=C sort -t "${FSTAB}" -k13r,13 "${f380}" > "${f390}"
 
+optim_csv_after_use "${f380}"
+
 stop_progress
 
 start_progress "Post-processing and splitting off Exec1"
@@ -1566,6 +1605,8 @@ awk ${awkLint}                              \
     -v f500="${f500Awk}"                    \
     -v f510="${f510Awk}"                    \
     "${f390}"
+
+optim_csv_after_use "${f390}"
 
 stop_progress
 
@@ -1594,6 +1635,8 @@ AWKSELECT23
 start_progress "Sorting (4)"
 
 LC_ALL=C sort -t "${FSTAB}" -k13,13 "${f500}" > "${f505}"
+
+optim_csv_after_use "${f500}"
 
 stop_progress
 
@@ -2037,22 +2080,26 @@ END {
 }
 AWKRESTORE
 
-start_progress "Preparing shellscripts for case of restore"
+if [ ${noRestore} -eq 0 ]; then
 
-awk ${awkLint}                              \
-    -f "${f700}"                            \
-    -v backupDir="${backupDirAwk}"          \
-    -v restoreDir="${sourceDirAwk}"         \
-    -v f800="${f800Awk}"                    \
-    -v f810="${f810Awk}"                    \
-    -v f820="${f820Awk}"                    \
-    -v f830="${f830Awk}"                    \
-    -v f840="${f840Awk}"                    \
-    -v f850="${f850Awk}"                    \
-    -v f860="${f860Awk}"                    \
-    "${f505}"
+  start_progress "Preparing shellscripts for case of restore"
 
-stop_progress
+  awk ${awkLint}                            \
+      -f "${f700}"                          \
+      -v backupDir="${backupDirAwk}"        \
+      -v restoreDir="${sourceDirAwk}"       \
+      -v f800="${f800Awk}"                  \
+      -v f810="${f810Awk}"                  \
+      -v f820="${f820Awk}"                  \
+      -v f830="${f830Awk}"                  \
+      -v f840="${f840Awk}"                  \
+      -v f850="${f850Awk}"                  \
+      -v f860="${f860Awk}"                  \
+      "${f505}"
+
+  stop_progress
+
+fi
 
 ###########################################################
 
