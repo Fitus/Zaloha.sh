@@ -534,6 +534,11 @@ function stop_progress {
   fi
 }
 
+function file_not_prepared {
+  if [ -e "${1}" ]; then
+    rm -f "${1}"
+  fi
+}
 function optim_csv_after_use {
   if [ ${optimCSV} -eq 1 ]; then
     rm -f "${1}"
@@ -1271,8 +1276,14 @@ if [ ${hLinks} -eq 1 ]; then
   stop_progress
 
   fAfterHLinks="${f360}"
+
 else
+
   fAfterHLinks="${f330}"
+
+  file_not_prepared "${f350}"
+  file_not_prepared "${f360}"
+
 fi
 
 ###########################################################
@@ -1916,20 +1927,32 @@ END {
 }
 AWKEXEC3
 
-start_progress "Preparing shellscript for Exec3"
+if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
 
-awk ${awkLint}                              \
-    -f "${f430}"                            \
-    -v sourceDir="${sourceDirAwk}"          \
-    -v backupDir="${backupDirAwk}"          \
-    -v noExec=${noExec}                     \
-    -v touch=${touch}                       \
-    -v pRevUser=${pRevUser}                 \
-    -v pRevGroup=${pRevGroup}               \
-    -v pRevMode=${pRevMode}                 \
-    "${f530}"                               > "${f630}"
+  start_progress "Preparing shellscript for Exec3"
 
-stop_progress
+  awk ${awkLint}                              \
+      -f "${f430}"                            \
+      -v sourceDir="${sourceDirAwk}"          \
+      -v backupDir="${backupDirAwk}"          \
+      -v noExec=${noExec}                     \
+      -v touch=${touch}                       \
+      -v pRevUser=${pRevUser}                 \
+      -v pRevGroup=${pRevGroup}               \
+      -v pRevMode=${pRevMode}                 \
+      "${f530}"                               > "${f630}"
+
+  stop_progress
+
+else
+
+  file_not_prepared "${f630}"
+
+  if [ -s "${f530}" ]; then
+    error_exit "Unexpected, REV actions prepared although neither --revNew nor --revUp options given"
+  fi
+
+fi
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKTOUCH' > "${f490}"
@@ -2099,6 +2122,16 @@ if [ ${noRestore} -eq 0 ]; then
 
   stop_progress
 
+else
+
+  file_not_prepared "${f800}"
+  file_not_prepared "${f810}"
+  file_not_prepared "${f820}"
+  file_not_prepared "${f830}"
+  file_not_prepared "${f840}"
+  file_not_prepared "${f850}"
+  file_not_prepared "${f860}"
+
 fi
 
 ###########################################################
@@ -2157,10 +2190,6 @@ if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
     else
       error_exit "User requested Zaloha to abort"
     fi
-  fi
-else
-  if [ -s "${f530}" ]; then
-    error_exit "Unexpected, REV actions prepared although neither --revNew nor --revUp options given"
   fi
 fi
 
