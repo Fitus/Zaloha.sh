@@ -443,6 +443,9 @@ The only exception are <findSourceOps> and <findGeneralOps>, which may contain t
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single quotes are disruptors. As a solution, the '"'"' quoting technique is used.
 
+In the CSV files 300 through 500, slashes are appended to file's paths. This is to ensure correct sort ordering of directories relative to their children.
+Imagine what would happen otherwise: Given dir and dir!, they would be sort ordered: dir, dir!, dir!/children, dir/children.
+
 Zaloha does not contain any explicit handling of national characters in filenames (= characters above ASCII 127).
 It is assumed that the commands used by Zaloha handle them transparently (which should be tested on environments where national characters are used in filenames).
 <sourceDir> and <backupDir> must use the same code page for national characters in filenames, because Zaloha does not contain any code page conversions.
@@ -539,6 +542,7 @@ function file_not_prepared {
     rm -f "${1}"
   fi
 }
+
 function optim_csv_after_use {
   if [ ${optimCSV} -eq 1 ]; then
     rm -f "${1}"
@@ -1000,7 +1004,7 @@ BEGIN {
   cmd = cmd "\\t%u"                    # column 10: file's user name
   cmd = cmd "\\t%g"                    # column 11: file's group name
   cmd = cmd "\\t%m"                    # column 12: file's permission bits (in octal)
-  cmd = cmd "\\t%P"                    # column 13: file's path with <sourceDir> or <backupDir> stripped
+  cmd = cmd "\\t%P/"                   # column 13: file's path with <sourceDir> or <backupDir> stripped, slash appended
   cmd = cmd "\\t" TRIPLET              # column 14: terminator field
   cmd = cmd "\\t%l"                    # column 15: object of symbolic link
   cmd = cmd "\\t" TRIPLET              # column 16: terminator field
@@ -1058,11 +1062,15 @@ awk ${awkLint} -f "${f100}" << 'AWKCLEANER' > "${f110}"
 ERROR_EXIT
 BEGIN {
   FS = FSTAB   # FSTAB or TAB, because fields are separated both by tabs produced by FIND as well as by tabs contained in filenames
+  OFS = FSTAB
   fin = 1      # field index in output record
   fpr = 0      # flag field in progress
 }
 {
   if (( 1 == fin ) && ( 16 == NF ) && ( TRIPLET == $1 ) && ( TRIPLET == $16 )) {
+    if ( "/" == $13 ) {
+      $13 = ""                                          # top-level directories must have no slash appended
+    }
     print                                               # the unproblematic case performance-optimized
   } else {                                              # full processing otherwise
     if ( 0 == NF ) {
@@ -1177,7 +1185,7 @@ BEGIN {
   if ( $12 !~ NUMBERREGEX ) {
     error_exit( "Unexpected, column 12 of cleaned file is not numeric" )
   }
-  if (( $13 == "" ) && ( 1 != FNR )) {
+  if ((( $13 == "" ) && ( 1 != FNR )) || ( $13 == "/" )) {
     error_exit( "Unexpected, column 13 of cleaned file is empty" )
   }
   if ( $14 != TRIPLET ) {
@@ -1239,7 +1247,7 @@ BEGIN {
       error_exit( "Unexpected falsely detected hardlink (mode differs)" )
     }
     $3 = "h"    # hardlink
-    $15 = pt    # object of hardlink
+    $15 = substr( pt, 1, length( pt ) - 1 )  # object of hardlink
   } else {
     hcn = 1     # detected hardlink count
     tp = $3     # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
@@ -1251,7 +1259,7 @@ BEGIN {
     us = $10    # previous record's column 10: file's user name
     gr = $11    # previous record's column 11: file's group name
     md = $12    # previous record's column 12: file's permission bits (in octal)
-    pt = $13    # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
+    pt = $13    # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped, slash appended
   }
   print
 }
@@ -1516,7 +1524,7 @@ function process_previous_record() {
   us = $10      # previous record's column 10: file's user name
   gr = $11      # previous record's column 11: file's group name
   md = $12      # previous record's column 12: file's permission bits (in octal)
-  pt = $13      # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
+  pt = $13      # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped, slash appended
   ol = $15      # previous record's column 15: object of symbolic link
 }
 END {
@@ -1571,6 +1579,7 @@ BEGIN {
 }
 function print_split() {
   if ( $2 ~ /^(RMDIR|REMOVE)/ ) {
+    $13 = substr( $13, 1, length( $13 ) - 1 )
     print > f510
   } else {
     print > f500
@@ -1625,17 +1634,22 @@ stop_progress
 awk ${awkLint} -f "${f100}" << 'AWKSELECT23' > "${f405}"
 BEGIN {
   FS = FSTAB
+  OFS = FSTAB
   gsub( TRIPLETBREGEX, BSLASH, f520 )
   gsub( TRIPLETBREGEX, BSLASH, f530 )
   printf "" > f520
   printf "" > f530
 }
 {
+  if ( "" != $13 ) {
+    $13 = substr( $13, 1, length( $13 ) - 1 )
+  }
   if ( $2 ~ /^(MKDIR|NEW|UPDATE|unl\.UP|ATTR)/ ) {
     print > f520
   } else if ( $2 ~ /^(REV\.MKDI|REV\.NEW|REV\.UP)/ ) {
     print > f530
   }
+  print
 }
 END {
   close( f530 )
@@ -1643,21 +1657,14 @@ END {
 }
 AWKSELECT23
 
-start_progress "Sorting (4)"
+start_progress "Sorting (4) and selecting Exec2 and Exec3"
 
-LC_ALL=C sort -t "${FSTAB}" -k13,13 "${f500}" > "${f505}"
-
-optim_csv_after_use "${f500}"
-
-stop_progress
-
-start_progress "Selecting Exec2 and Exec3"
-
-awk ${awkLint}                              \
+LC_ALL=C sort -t "${FSTAB}" -k13,13 "${f500}" | awk ${awkLint} \
     -f "${f405}"                            \
     -v f520="${f520Awk}"                    \
-    -v f530="${f530Awk}"                    \
-    "${f505}"
+    -v f530="${f530Awk}"                    > "${f505}"
+
+optim_csv_after_use "${f500}"
 
 stop_progress
 
@@ -2028,7 +2035,7 @@ BEGIN {
   print "TOUCH6='touch -r'" > f810
   print "TOUCH7='touch -r'" > f810
   print "TOUCH8='touch -r'" > f810
-  print "LNSYMB='ln -s'" > f820
+  print "LNSYMB='ln -s --'" > f820
   print "LNHARD='ln'" > f830
   print "CHOWN='chown -h'" > f840
   print "CHGRP='chgrp -h'" > f850
