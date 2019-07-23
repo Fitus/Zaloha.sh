@@ -156,8 +156,8 @@ where human oversight and confirmation of prepared actions are in place. Do not 
 
 Metadata directory of Zaloha
 ----------------------------
-Zaloha creates a metadata directory: <backupDir>/.Zaloha_metadata. The purposes of individual files in that directory are described in a separate section below.
-Briefly, the metadata directory is used for:
+Zaloha creates a metadata directory: <backupDir>/.Zaloha_metadata. The location of the metadata directory can be changed via the "--metaDir" option.
+The purposes of individual files in that directory are described in a separate section below. Briefly, the metadata directory is used for:
 
  - AWK program files (produced from "here documents" in Zaloha)
  - CSV metadata files
@@ -238,7 +238,9 @@ Other options are always introduced by a double dash (--), and either have a val
     The placeholder ///d/ is for <sourceDir> or <backupDir>, depending on the actual search.
     To extend (= combine, not replace) the internally defined <findGeneralOps> with own extension, pass in own extension prepended by plus sign ("+").
 
---noExec        ... needed if Zaloha is invoked automatically: do not ask, do not execute the actions (but still prepare the scripts, see further notes below)
+--noExec        ... needed if Zaloha is invoked automatically: do not ask, do not execute the actions, but still prepare the scripts.
+    The prepared scripts do not contain shell tracing and they do not contain the "set -e" instruction. This means that the scripts ignore individual failed commands
+    and try to do as much work as possible, which is a behavior different from the interactive regime, where scripts are traced and halt on the first error.
 
 --revNew        ... activate REV.NEW (= if standalone file on <backupDir> is newer than the last run of Zaloha, reverse-copy it to <sourceDir>)
 
@@ -246,11 +248,11 @@ Other options are always introduced by a double dash (--), and either have a val
 
 --hLinks        ... perform hardlink detection (inode-deduplication) on <sourceDir>
 
---ok3600s       ... additional tolerance for modification time differences of exactly +/- 3600 seconds (explained below)
+--ok3600s       ... additional tolerance for modification time differences of exactly +/- 3600 seconds (explained in Special Cases section below)
 
 --noUnlink      ... never unlink multiply linked files on <backupDir> before writing to them
 
---touch         ... use cp + touch instead of cp --preserve=timestamps (explained below)
+--touch         ... use cp + touch instead of cp --preserve=timestamps (explained in Special Cases section below)
 
 --pUser         ... synchronize user ownerships on <backupDir> based on <sourceDir>
 
@@ -264,11 +266,21 @@ Other options are always introduced by a double dash (--), and either have a val
 
 --pRevMode      ... preserve modes (permission bits) during REV operations
 
---noRestore     ... do not prepare scripts for the case of restore (= saves processing time and disk space, see remarks below)
+--noRestore     ... do not prepare scripts for the case of restore (= saves processing time and disk space, see optimization remarks below)
+    The scripts for the case of restore can still be produced ex-post by manually running the respective AWK program (700 file) on the source CSV file (505 file).
 
---optimCSV      ... optimize space occupied by CSV metadata files by removing intermediary CSV files after use (see remarks below)
+--optimCSV      ... optimize space occupied by CSV metadata files by removing intermediary CSV files after use (see optimization remarks below)
+    If intermediary CSV metadata files are removed, an ex-post analysis of eventual problems may be impossible.
+
+--metaDir=<metaDir> allows to place the Zaloha metadata directory to a different location than the default (which is <backupDir>/.Zaloha_metadata).
+    The reasons might be:
+      a) non-writable <backupDir> (if Zaloha is used to perform comparison only (i.e. with "--noExec" option))
+      b) a requirement to have Zaloha metadata on a separate storage
+    It is possible (but not recommended) to place <metaDir> to a different location inside of <backupDir>, or inside of <sourceDir>.
+    In such cases, FIND operands to exclude the metadata directory from the FIND searches must be explicitly passed in via <findGeneralOps>.
 
 --noProgress    ... suppress progress messages (less screen output)
+    If both options "--noExec" and "--noProgress" are used, Zaloha does not produce any output on stdout (traditional behavior of Unics tools).
 
 --color         ... use color highlighting (can be used on terminals which support ANSI escape codes)
 
@@ -276,18 +288,9 @@ Other options are always introduced by a double dash (--), and either have a val
 
 --lTest         ... (do not use in real operations) support for lint-testing of AWK programs
 
-If option "--noExec" is used, Zaloha does not execute the actions, but still prepares the scripts. The prepared scripts do not contain shell tracing
-and they do not contain the "set -e" instruction. Also, the scripts ignore individual failed commands and try to do as much work as possible, which is
-a behavior different from the interactive regime, where scripts are traced and halt on the first error.
-
-If both options "--noExec" and "--noProgress" are used, Zaloha does not produce any output on stdout (traditional behavior of Unics tools).
-
-Optimization options "--noRestore" and "--optimCSV": If Zaloha operates on directories with huge numbers of files, especially small ones,
-then the size of metadata plus the size of scripts for the case of restore may exceed the size of the files themselves.
-In such cases, suppressing the preparation of scripts for the case of restore ("--noRestore" option)
-and/or removing of intermediary CSV metadata files after use ("--optimCSV" option) bring relief.
-The scripts for the case of restore can still be produced ex-post by manually running the respective AWK program (700 file) on the source CSV file (505 file).
-If intermediary CSV metadata files are removed, an ex-post analysis of eventual problems may be impossible.
+Optimization remarks: If Zaloha operates on directories with huge numbers of files, especially small ones, then the size of metadata
+plus the size of scripts for the case of restore may exceed the size of the files themselves. If this leads to hitting of storage
+and/or processing time limits, use options "--noRestore" and "--optimCSV".
 
 Zaloha must be run by a user with sufficient privileges to read <sourceDir> and to write and perform other required actions on <backupDir>.
 In case of the REV actions, privileges to write and perform other required actions on <sourceDir> are required as well.
@@ -352,10 +355,15 @@ SPECIAL AND CORNER CASES
 
 To detect which files need synchronization, Zaloha compares file sizes and modification times. If the file sizes differ, synchronization is needed.
 The modification time is more tricky: Zaloha tolerates +/- 1 second differences, due to FAT32 rounding to the nearest 2 seconds.
-Additionally, when daylight saving time is incorrectly set up on the OS level, it is necessary to tolerate differences of exactly +/- 1 hour (+/- 3600 seconds) as well.
-This can be activated via the "--ok3600s" option.
+In some situations, it is necessary to tolerate differences of exactly +/- 1 hour (+/- 3600 seconds) as well (to be activated via the "--ok3600s" option).
+Typically, this occurs when one of the directories is on a filesystem type which does not store timezones together with modification times (e.g. FAT32),
+and the OS cannot derive the timezones on-the-fly due to some incorrect setup.
 
-<backupDir> can be a subdirectory of <sourceDir> or vice versa. In such cases, conditions to avoid recursive copying must be passed in via <findGeneralOps>.
+The +/- 1 hour differences, tolerable via the "--ok3600s" option, are assumed to exist between <sourceDir> and <backupDir>, but not between <backupDir> and <metaDir>.
+This point is relevant especially if <metaDir> is located outside of <backupDir> (via the "--metaDir" option).
+
+It is possible (but not recommended) for <backupDir> to be a subdirectory of <sourceDir> or vice versa.
+In such cases, conditions to avoid recursive copying must be passed in via <findGeneralOps>.
 
 The SORT commands are run under the LC_ALL=C environment variable, to avoid a problem caused by some locales that ignore slashes and other punctuations during sorting.
 
@@ -454,8 +462,6 @@ It is assumed that the commands used by Zaloha handle them transparently (which 
 
 DEFINITION OF INDIVIDUAL FILES IN METADATA DIRECTORY OF ZALOHA:
 ZALOHADOCU
-
-metadataDir=".Zaloha_metadata"           # Metadata directory of Zaloha, located directly under <backupDir>
 
 f000Base="000_parameters.csv"            # parameters under which Zaloha was invoked and internal variables
 
@@ -596,6 +602,7 @@ pRevGroup=0
 pRevMode=0
 noRestore=0
 optimCSV=0
+metaDir=
 noProgress=0
 color=0
 wTest=0
@@ -623,6 +630,7 @@ do
     --pRevMode)          pRevMode=1 ;                     shift ;;
     --noRestore)         noRestore=1 ;                    shift ;;
     --optimCSV)          optimCSV=1 ;                     shift ;;
+    --metaDir=*)         metaDir="M${tmpVal#*=}";         shift ;;
     --noProgress)        noProgress=1 ;                   shift ;;
     --color)             color=1 ;                        shift ;;
     --wTest)             wTest=1 ;                        shift ;;
@@ -648,13 +656,11 @@ if [ ! -d "${sourceDir}" ] && [ ${wTest} -eq 0 ]; then
     error_exit "<sourceDir> is not a directory"
 fi
 sourceDirAwk="${sourceDir//${BSLASHPATTERN}/${TRIPLETB}}"
-sourceDirParsAwk="${sourceDirAwk//${DQUOTEPATTERN}/${TRIPLETB}${DQUOTE}}"
-sourceDirParsPattAwk="${sourceDir//${BSLASHPATTERN}/${TRIPLETB}${TRIPLETB}}"
-sourceDirParsPattAwk="${sourceDirParsPattAwk//${DQUOTEPATTERN}/${TRIPLETB}${DQUOTE}}"
-sourceDirParsPattAwk="${sourceDirParsPattAwk//${ASTERISKPATTERN}/${TRIPLETB}${ASTERISK}}"
-sourceDirParsPattAwk="${sourceDirParsPattAwk//${QUESTIONMARKPATTERN}/${TRIPLETB}${QUESTIONMARK}}"
-sourceDirParsPattAwk="${sourceDirParsPattAwk//${LBRACKETPATTERN}/${TRIPLETB}${LBRACKET}}"
-sourceDirParsPattAwk="${sourceDirParsPattAwk//${RBRACKETPATTERN}/${TRIPLETB}${RBRACKET}}"
+sourceDirPattAwk="${sourceDir//${BSLASHPATTERN}/${TRIPLETB}${TRIPLETB}}"
+sourceDirPattAwk="${sourceDirPattAwk//${ASTERISKPATTERN}/${TRIPLETB}${ASTERISK}}"
+sourceDirPattAwk="${sourceDirPattAwk//${QUESTIONMARKPATTERN}/${TRIPLETB}${QUESTIONMARK}}"
+sourceDirPattAwk="${sourceDirPattAwk//${LBRACKETPATTERN}/${TRIPLETB}${LBRACKET}}"
+sourceDirPattAwk="${sourceDirPattAwk//${RBRACKETPATTERN}/${TRIPLETB}${RBRACKET}}"
 sourceDirEsc="${sourceDir//${TAB}/${TRIPLETT}}"
 sourceDirEsc="${sourceDirEsc//${NLINE}/${TRIPLETN}}"
 if [ ${color} -eq 1 ]; then
@@ -682,13 +688,11 @@ if [ ! -d "${backupDir}" ]; then
     error_exit "<backupDir> is not a directory"
 fi
 backupDirAwk="${backupDir//${BSLASHPATTERN}/${TRIPLETB}}"
-backupDirParsAwk="${backupDirAwk//${DQUOTEPATTERN}/${TRIPLETB}${DQUOTE}}"
-backupDirParsPattAwk="${backupDir//${BSLASHPATTERN}/${TRIPLETB}${TRIPLETB}}"
-backupDirParsPattAwk="${backupDirParsPattAwk//${DQUOTEPATTERN}/${TRIPLETB}${DQUOTE}}"
-backupDirParsPattAwk="${backupDirParsPattAwk//${ASTERISKPATTERN}/${TRIPLETB}${ASTERISK}}"
-backupDirParsPattAwk="${backupDirParsPattAwk//${QUESTIONMARKPATTERN}/${TRIPLETB}${QUESTIONMARK}}"
-backupDirParsPattAwk="${backupDirParsPattAwk//${LBRACKETPATTERN}/${TRIPLETB}${LBRACKET}}"
-backupDirParsPattAwk="${backupDirParsPattAwk//${RBRACKETPATTERN}/${TRIPLETB}${RBRACKET}}"
+backupDirPattAwk="${backupDir//${BSLASHPATTERN}/${TRIPLETB}${TRIPLETB}}"
+backupDirPattAwk="${backupDirPattAwk//${ASTERISKPATTERN}/${TRIPLETB}${ASTERISK}}"
+backupDirPattAwk="${backupDirPattAwk//${QUESTIONMARKPATTERN}/${TRIPLETB}${QUESTIONMARK}}"
+backupDirPattAwk="${backupDirPattAwk//${LBRACKETPATTERN}/${TRIPLETB}${LBRACKET}}"
+backupDirPattAwk="${backupDirPattAwk//${RBRACKETPATTERN}/${TRIPLETB}${RBRACKET}}"
 backupDirEsc="${backupDir//${TAB}/${TRIPLETT}}"
 backupDirEsc="${backupDirEsc//${NLINE}/${TRIPLETN}}"
 if [ ${color} -eq 1 ]; then
@@ -729,80 +733,111 @@ findGeneralOpsEsc="${findGeneralOps//${TAB}/${TRIPLETT}}"
 findGeneralOpsEsc="${findGeneralOpsEsc//${NLINE}/${TRIPLETN}}"
 
 ###########################################################
-if [ ! -d "${backupDir}${metadataDir}" ]; then
-  mkdir "${backupDir}${metadataDir}"
+metaDirInternalBase=".Zaloha_metadata"
+metaDirInternal="${backupDir}${metaDirInternalBase}"
+if [ "M" == "${metaDir:0:1}" ]; then
+    metaDir="${metaDir:1}"
+    metaDirDefault=0
+else
+    metaDir="${metaDirInternal}"
+    metaDirDefault=1
+fi
+if [ "" == "${metaDir}" ]; then
+    error_exit "<metaDir> is mandatory if --metaDir option is given"
+fi
+if [ "/" != "${metaDir:0:1}" ] && [ "./" != "${metaDir:0:2}" ]; then
+    metaDir="./${metaDir}"
+fi
+if [ "/" != "${metaDir: -1:1}" ]; then
+    metaDir="${metaDir}/"
+fi
+if [ "${metaDir/${TRIPLET}/}" != "${metaDir}" ]; then
+    error_exit "<metaDir> contains the directory separator triplet (${TRIPLET})"
+fi
+metaDirAwk="${metaDir//${BSLASHPATTERN}/${TRIPLETB}}"
+metaDirPattAwk="${metaDir//${BSLASHPATTERN}/${TRIPLETB}${TRIPLETB}}"
+metaDirPattAwk="${metaDirPattAwk//${ASTERISKPATTERN}/${TRIPLETB}${ASTERISK}}"
+metaDirPattAwk="${metaDirPattAwk//${QUESTIONMARKPATTERN}/${TRIPLETB}${QUESTIONMARK}}"
+metaDirPattAwk="${metaDirPattAwk//${LBRACKETPATTERN}/${TRIPLETB}${LBRACKET}}"
+metaDirPattAwk="${metaDirPattAwk//${RBRACKETPATTERN}/${TRIPLETB}${RBRACKET}}"
+metaDirEsc="${metaDir//${TAB}/${TRIPLETT}}"
+metaDirEsc="${metaDirEsc//${NLINE}/${TRIPLETN}}"
+
+###########################################################
+if [ ! -d "${metaDir}" ]; then
+  mkdir -p "${metaDir}"
 fi
 
-f000="${backupDir}${metadataDir}/${f000Base}"
-f100="${backupDir}${metadataDir}/${f100Base}"
-f102="${backupDir}${metadataDir}/${f102Base}"
-f104="${backupDir}${metadataDir}/${f104Base}"
-f106="${backupDir}${metadataDir}/${f106Base}"
-f110="${backupDir}${metadataDir}/${f110Base}"
-f130="${backupDir}${metadataDir}/${f130Base}"
-f150="${backupDir}${metadataDir}/${f150Base}"
-f170="${backupDir}${metadataDir}/${f170Base}"
-f190="${backupDir}${metadataDir}/${f190Base}"
-f200="${backupDir}${metadataDir}/${f200Base}"
-f210="${backupDir}${metadataDir}/${f210Base}"
-f220="${backupDir}${metadataDir}/${f220Base}"
-f300="${backupDir}${metadataDir}/${f300Base}"
-f310="${backupDir}${metadataDir}/${f310Base}"
-f320="${backupDir}${metadataDir}/${f320Base}"
-f330="${backupDir}${metadataDir}/${f330Base}"
-f340="${backupDir}${metadataDir}/${f340Base}"
-f350="${backupDir}${metadataDir}/${f350Base}"
-f360="${backupDir}${metadataDir}/${f360Base}"
-f370="${backupDir}${metadataDir}/${f370Base}"
-f380="${backupDir}${metadataDir}/${f380Base}"
-f390="${backupDir}${metadataDir}/${f390Base}"
-f405="${backupDir}${metadataDir}/${f405Base}"
-f410="${backupDir}${metadataDir}/${f410Base}"
-f420="${backupDir}${metadataDir}/${f420Base}"
-f430="${backupDir}${metadataDir}/${f430Base}"
-f490="${backupDir}${metadataDir}/${f490Base}"
-f500="${backupDir}${metadataDir}/${f500Base}"
-f505="${backupDir}${metadataDir}/${f505Base}"
-f510="${backupDir}${metadataDir}/${f510Base}"
-f520="${backupDir}${metadataDir}/${f520Base}"
-f530="${backupDir}${metadataDir}/${f530Base}"
-f610="${backupDir}${metadataDir}/${f610Base}"
-f620="${backupDir}${metadataDir}/${f620Base}"
-f630="${backupDir}${metadataDir}/${f630Base}"
-f690="${backupDir}${metadataDir}/${f690Base}"
-f700="${backupDir}${metadataDir}/${f700Base}"
-f800="${backupDir}${metadataDir}/${f800Base}"
-f810="${backupDir}${metadataDir}/${f810Base}"
-f820="${backupDir}${metadataDir}/${f820Base}"
-f830="${backupDir}${metadataDir}/${f830Base}"
-f840="${backupDir}${metadataDir}/${f840Base}"
-f850="${backupDir}${metadataDir}/${f850Base}"
-f860="${backupDir}${metadataDir}/${f860Base}"
-f999="${backupDir}${metadataDir}/${f999Base}"
+f000="${metaDir}${f000Base}"
+f100="${metaDir}${f100Base}"
+f102="${metaDir}${f102Base}"
+f104="${metaDir}${f104Base}"
+f106="${metaDir}${f106Base}"
+f110="${metaDir}${f110Base}"
+f130="${metaDir}${f130Base}"
+f150="${metaDir}${f150Base}"
+f170="${metaDir}${f170Base}"
+f190="${metaDir}${f190Base}"
+f200="${metaDir}${f200Base}"
+f210="${metaDir}${f210Base}"
+f220="${metaDir}${f220Base}"
+f300="${metaDir}${f300Base}"
+f310="${metaDir}${f310Base}"
+f320="${metaDir}${f320Base}"
+f330="${metaDir}${f330Base}"
+f340="${metaDir}${f340Base}"
+f350="${metaDir}${f350Base}"
+f360="${metaDir}${f360Base}"
+f370="${metaDir}${f370Base}"
+f380="${metaDir}${f380Base}"
+f390="${metaDir}${f390Base}"
+f405="${metaDir}${f405Base}"
+f410="${metaDir}${f410Base}"
+f420="${metaDir}${f420Base}"
+f430="${metaDir}${f430Base}"
+f490="${metaDir}${f490Base}"
+f500="${metaDir}${f500Base}"
+f505="${metaDir}${f505Base}"
+f510="${metaDir}${f510Base}"
+f520="${metaDir}${f520Base}"
+f530="${metaDir}${f530Base}"
+f610="${metaDir}${f610Base}"
+f620="${metaDir}${f620Base}"
+f630="${metaDir}${f630Base}"
+f690="${metaDir}${f690Base}"
+f700="${metaDir}${f700Base}"
+f800="${metaDir}${f800Base}"
+f810="${metaDir}${f810Base}"
+f820="${metaDir}${f820Base}"
+f830="${metaDir}${f830Base}"
+f840="${metaDir}${f840Base}"
+f850="${metaDir}${f850Base}"
+f860="${metaDir}${f860Base}"
+f999="${metaDir}${f999Base}"
 
-f300Awk="${backupDirAwk}${metadataDir}/${f300Base}"
-f310Awk="${backupDirAwk}${metadataDir}/${f310Base}"
-f320Awk="${backupDirAwk}${metadataDir}/${f320Base}"
-f500Awk="${backupDirAwk}${metadataDir}/${f500Base}"
-f510Awk="${backupDirAwk}${metadataDir}/${f510Base}"
-f520Awk="${backupDirAwk}${metadataDir}/${f520Base}"
-f530Awk="${backupDirAwk}${metadataDir}/${f530Base}"
-f800Awk="${backupDirAwk}${metadataDir}/${f800Base}"
-f810Awk="${backupDirAwk}${metadataDir}/${f810Base}"
-f820Awk="${backupDirAwk}${metadataDir}/${f820Base}"
-f830Awk="${backupDirAwk}${metadataDir}/${f830Base}"
-f840Awk="${backupDirAwk}${metadataDir}/${f840Base}"
-f850Awk="${backupDirAwk}${metadataDir}/${f850Base}"
-f860Awk="${backupDirAwk}${metadataDir}/${f860Base}"
+f300Awk="${metaDirAwk}${f300Base}"
+f310Awk="${metaDirAwk}${f310Base}"
+f320Awk="${metaDirAwk}${f320Base}"
+f500Awk="${metaDirAwk}${f500Base}"
+f510Awk="${metaDirAwk}${f510Base}"
+f520Awk="${metaDirAwk}${f520Base}"
+f530Awk="${metaDirAwk}${f530Base}"
+f800Awk="${metaDirAwk}${f800Base}"
+f810Awk="${metaDirAwk}${f810Base}"
+f820Awk="${metaDirAwk}${f820Base}"
+f830Awk="${metaDirAwk}${f830Base}"
+f840Awk="${metaDirAwk}${f840Base}"
+f850Awk="${metaDirAwk}${f850Base}"
+f860Awk="${metaDirAwk}${f860Base}"
 
-findArgsLastRunAwk="${DQUOTE}${backupDirParsAwk}${DQUOTE}${metadataDir} -path ${TRIPLETDSEP}${metadataDir}/${f999Base}"
-findArgsLastRunAwk="${findArgsLastRunAwk//${TRIPLETDSEP}/${DQUOTE}${backupDirParsPattAwk}${DQUOTE}}"
+findLastRunOpsFinalAwk="-path ${TRIPLETDSEP}${f999Base}"
+findSourceOpsFinalAwk="${findGeneralOpsAwk} ${findSourceOpsAwk}"
+findBackupOpsFinalAwk="${findGeneralOpsAwk}"
 
-findArgsSourceAwk="${DQUOTE}${sourceDirParsAwk}${DQUOTE} -path ${TRIPLETDSEP}${metadataDir} -prune -o ${findGeneralOpsAwk} ${findSourceOpsAwk}"
-findArgsSourceAwk="${findArgsSourceAwk//${TRIPLETDSEP}/${DQUOTE}${sourceDirParsPattAwk}${DQUOTE}}"
-
-findArgsBackupAwk="${DQUOTE}${backupDirParsAwk}${DQUOTE} -path ${TRIPLETDSEP}${metadataDir} -prune -o ${findGeneralOpsAwk}"
-findArgsBackupAwk="${findArgsBackupAwk//${TRIPLETDSEP}/${DQUOTE}${backupDirParsPattAwk}${DQUOTE}}"
+if [ ${metaDirDefault} -eq 1 ]; then
+  findSourceOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findSourceOpsFinalAwk}"
+  findBackupOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findBackupOpsFinalAwk}"
+fi
 
 awkLint=
 if [ ${lTest} -eq 1 ]; then
@@ -813,14 +848,12 @@ fi
 awk ${awkLint} '{ print }' << PARAMFILE > "${f000}"
 ${TRIPLET}${FSTAB}sourceDir${FSTAB}${sourceDir}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}sourceDirAwk${FSTAB}${sourceDirAwk}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}sourceDirParsAwk${FSTAB}${sourceDirParsAwk}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}sourceDirParsPattAwk${FSTAB}${sourceDirParsPattAwk}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}sourceDirPattAwk${FSTAB}${sourceDirPattAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}sourceDirEsc${FSTAB}${sourceDirEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}sourceDirTerm${FSTAB}${sourceDirTerm}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}backupDir${FSTAB}${backupDir}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}backupDirAwk${FSTAB}${backupDirAwk}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}backupDirParsAwk${FSTAB}${backupDirParsAwk}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}backupDirParsPattAwk${FSTAB}${backupDirParsPattAwk}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}backupDirPattAwk${FSTAB}${backupDirPattAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}backupDirEsc${FSTAB}${backupDirEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}backupDirTerm${FSTAB}${backupDirTerm}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findSourceOps${FSTAB}${findSourceOps}${FSTAB}${TRIPLET}
@@ -844,14 +877,18 @@ ${TRIPLET}${FSTAB}pRevGroup${FSTAB}${pRevGroup}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}pRevMode${FSTAB}${pRevMode}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noRestore${FSTAB}${noRestore}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}optimCSV${FSTAB}${optimCSV}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}metaDir${FSTAB}${metaDir}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}metaDirAwk${FSTAB}${metaDirAwk}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}metaDirPattAwk${FSTAB}${metaDirPattAwk}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}metaDirDefault${FSTAB}${metaDirDefault}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}metaDirEsc${FSTAB}${metaDirEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}wTest${FSTAB}${wTest}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}lTest${FSTAB}${lTest}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}metadataDir${FSTAB}${metadataDir}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}findArgsLastRunAwk${FSTAB}${findArgsLastRunAwk}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}findArgsSourceAwk${FSTAB}${findArgsSourceAwk}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}findArgsBackupAwk${FSTAB}${findArgsBackupAwk}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}findLastRunOpsFinalAwk${FSTAB}${findLastRunOpsFinalAwk}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}findSourceOpsFinalAwk${FSTAB}${findSourceOpsFinalAwk}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}findBackupOpsFinalAwk${FSTAB}${findBackupOpsFinalAwk}${FSTAB}${TRIPLET}
 PARAMFILE
 
 ###########################################################
@@ -886,6 +923,8 @@ BEGIN {
   gsub( /TRIPLETTREGEX/, "/\\/\\/\\/t/" )
   gsub( /TRIPLETNREGEX/, "/\\/\\/\\/n/" )
   gsub( /TRIPLETBREGEX/, "/\\/\\/\\/b/" )
+  gsub( /TRIPLETDSEPLENGTH/, "5" )
+  gsub( /TRIPLETDSEP/, "\"///d/\"" )
   gsub( /TRIPLETT/, "\"///t\"" )
   gsub( /TRIPLETN/, "\"///n\"" )
   gsub( /TRIPLETC/, "\"///c\"" )
@@ -942,17 +981,20 @@ AWKACTIONS2TERM
 awk ${awkLint} -f "${f100}" << 'AWKPARSER' > "${f106}"
 ERROR_EXIT
 BEGIN {
-  gsub( TRIPLETBREGEX, BSLASH, findArgs )
+  gsub( TRIPLETBREGEX, BSLASH, findDir )
+  gsub( TRIPLETBREGEX, BSLASH, findOps )
+  gsub( TRIPLETBREGEX, BSLASH, tripletDSepV )
   gsub( TRIPLETBREGEX, BSLASH, outFile )
+  gsub( QUOTEREGEX, QUOTEESC, findDir )
   gsub( QUOTEREGEX, QUOTEESC, outFile )
-  cmd = "find"                    # FIND command being constructed
+  cmd = "find '" findDir "'"      # FIND command being constructed
   wrd = ""                        # word of FIND command being constructed
   iwd = 0                         # flag inside of word
   idq = 0                         # flag inside of double-quote
   bsl = 0                         # flag backslash remembered
-  findArgs = findArgs " "
-  for ( i = 1; i <= length( findArgs ); i++ ) {
-    c = substr( findArgs, i, 1 )
+  findOps = findOps " "
+  for ( i = 1; i <= length( findOps ); i++ ) {
+    c = substr( findOps, i, 1 )
     if ( 1 == bsl ) {
       bsl = 0
       if ( DQUOTE == c ) {
@@ -982,14 +1024,32 @@ BEGIN {
       iwd = 1
       wrd = wrd c
     }
+    # word boundary found: post-process word and add it to command
     if (( 0 == iwd ) && ( "" != wrd )) {
-      gsub( QUOTEREGEX, QUOTEESC, wrd )
-      cmd = cmd " '" wrd "'"
+      j = index( wrd, TRIPLETDSEP )
+      if ( 0 != j ) {
+        wpp = ""                  # word of FIND command post-processed
+        if ( 1 < j ) {
+          wpp = wpp substr( wrd, 1, j - 1 )
+        }
+        wpp = wpp tripletDSepV
+        if ( j < length( wrd ) - TRIPLETDSEPLENGTH + 1 ) {
+          wpp = wpp substr( wrd, j + TRIPLETDSEPLENGTH )
+        }
+        j = index( wpp, TRIPLETDSEP )
+        if ( 0 != j ) {
+          error_exit( "<findOps> contains more than one placeholder " TRIPLETDSEP " in one word" )
+        }
+      } else {
+        wpp = wrd
+      }
+      gsub( QUOTEREGEX, QUOTEESC, wpp )
+      cmd = cmd " '" wpp "'"
       wrd = ""
     }
   }
   if ( 1 == idq ) {
-    error_exit( "<findArgs> contains unpaired double quote" )
+    error_exit( "<findOps> contains unpaired double quote" )
   }
   cmd = cmd " -printf '"
   cmd = cmd TRIPLET                    # column  1: leading field
@@ -1031,21 +1091,27 @@ start_progress "Parsing"
 awk ${awkLint}                              \
     -f "${f106}"                            \
     -v srcBackup="L"                        \
-    -v findArgs="${findArgsLastRunAwk}"     \
+    -v findDir="${metaDirAwk}"              \
+    -v findOps="${findLastRunOpsFinalAwk}"  \
+    -v tripletDSepV="${metaDirPattAwk}"     \
     -v outFile="${f300Awk}"                 \
     -v noProgress=${noProgress}             > "${f200}"
 
 awk ${awkLint}                              \
     -f "${f106}"                            \
     -v srcBackup="S"                        \
-    -v findArgs="${findArgsSourceAwk}"      \
+    -v findDir="${sourceDirAwk}"            \
+    -v findOps="${findSourceOpsFinalAwk}"   \
+    -v tripletDSepV="${sourceDirPattAwk}"   \
     -v outFile="${f310Awk}"                 \
     -v noProgress=${noProgress}             > "${f210}"
 
 awk ${awkLint}                              \
     -f "${f106}"                            \
     -v srcBackup="B"                        \
-    -v findArgs="${findArgsBackupAwk}"      \
+    -v findDir="${backupDirAwk}"            \
+    -v findOps="${findBackupOpsFinalAwk}"   \
+    -v tripletDSepV="${backupDirPattAwk}"   \
     -v outFile="${f320Awk}"                 \
     -v noProgress=${noProgress}             > "${f220}"
 
@@ -1964,14 +2030,14 @@ fi
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKTOUCH' > "${f490}"
 BEGIN {
-  gsub( TRIPLETBREGEX, BSLASH, backupDir )
-  gsub( QUOTEREGEX, QUOTEESC, backupDir )
+  gsub( TRIPLETBREGEX, BSLASH, metaDir )
+  gsub( QUOTEREGEX, QUOTEESC, metaDir )
   BIN_BASH
-  print "backupDir='" backupDir "'"
+  print "metaDir='" metaDir "'"
   print "TOUCH='touch -r'"
   SECTION_LINE
-  print "${TOUCH} \"${backupDir}\"" metadataDir "/" f000Base \
-                " \"${backupDir}\"" metadataDir "/" f999Base
+  print "${TOUCH} \"${metaDir}\"" f000Base \
+                " \"${metaDir}\"" f999Base
   SECTION_LINE
 }
 AWKTOUCH
@@ -1980,8 +2046,7 @@ start_progress "Preparing shellscript to touch file 999"
 
 awk ${awkLint}                              \
     -f "${f490}"                            \
-    -v backupDir="${backupDirAwk}"          \
-    -v metadataDir="${metadataDir}"         \
+    -v metaDir="${metaDirAwk}"              \
     -v f000Base="${f000Base}"               \
     -v f999Base="${f999Base}"               > "${f690}"
 
