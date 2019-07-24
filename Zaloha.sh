@@ -278,6 +278,15 @@ Other options are always introduced by a double dash (--), and either have a val
       b) a requirement to have Zaloha metadata on a separate storage
     It is possible (but not recommended) to place <metaDir> to a different location inside of <backupDir>, or inside of <sourceDir>.
     In such cases, FIND operands to exclude the metadata directory from the FIND searches must be explicitly passed in via <findGeneralOps>.
+    If Zaloha is used to synchronize multiple directories, then each such instance of Zaloha must have its own separate metadata directory.
+
+--noFindSource  ... do not run FIND (script 210) to search <sourceDir>, and use externally supplied CSV data file 310 instead
+--noFindBackup  ... do not run FIND (script 220) to search <backupDir>, and use externally supplied CSV data file 320 instead
+   Use these options if you have better (especially performance-wise) methods for obtaining the CSV data files 310 and/or 320.
+   For instance, if <sourceDir> and/or <backupDir> are network-mounted directories, running FIND commands on them might be slow.
+   Running FIND directly on the file server (e.g. via SSH) and downloading the resulting CSV data file should be much quicker.
+   The externally supplied CSV data files 310 and/or 320 must be placed into the Zaloha metadata directory before invoking Zaloha,
+   and these files must, of course, have the same format as the CSV data files that would otherwise be produced by the scripts 210 and 220.
 
 --noProgress    ... suppress progress messages (less screen output)
     If both options "--noExec" and "--noProgress" are used, Zaloha does not produce any output on stdout (traditional behavior of Unics tools).
@@ -603,6 +612,8 @@ pRevMode=0
 noRestore=0
 optimCSV=0
 metaDir=
+noFindSource=0
+noFindBackup=0
 noProgress=0
 color=0
 wTest=0
@@ -631,6 +642,8 @@ do
     --noRestore)         noRestore=1 ;                    shift ;;
     --optimCSV)          optimCSV=1 ;                     shift ;;
     --metaDir=*)         metaDir="M${tmpVal#*=}";         shift ;;
+    --noFindSource)      noFindSource=1 ;                 shift ;;
+    --noFindBackup)      noFindBackup=1 ;                 shift ;;
     --noProgress)        noProgress=1 ;                   shift ;;
     --color)             color=1 ;                        shift ;;
     --wTest)             wTest=1 ;                        shift ;;
@@ -882,6 +895,8 @@ ${TRIPLET}${FSTAB}metaDirAwk${FSTAB}${metaDirAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirPattAwk${FSTAB}${metaDirPattAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirDefault${FSTAB}${metaDirDefault}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirEsc${FSTAB}${metaDirEsc}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noFindSource${FSTAB}${noFindSource}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noFindBackup${FSTAB}${noFindBackup}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}wTest${FSTAB}${wTest}${FSTAB}${TRIPLET}
@@ -1119,9 +1134,37 @@ stop_progress
 
 bash "${f200}" | awk ${awkLint} -f "${f102}" -v color=${color}
 
-bash "${f210}" | awk ${awkLint} -f "${f102}" -v color=${color}
+if [ ${noFindSource} -eq 0 ]; then
 
-bash "${f220}" | awk ${awkLint} -f "${f102}" -v color=${color}
+  bash "${f210}" | awk ${awkLint} -f "${f102}" -v color=${color}
+
+else
+
+  if [ ! -f "${f310}" ]; then
+    error_exit "The externally supplied CSV data file 310 does not exist"
+  fi
+
+  if [ ! "${f310}" -nt "${f999}" ]; then
+    error_exit "The externally supplied CSV data file 310 is not newer than the last run of Zaloha"
+  fi
+
+fi
+
+if [ ${noFindBackup} -eq 0 ]; then
+
+  bash "${f220}" | awk ${awkLint} -f "${f102}" -v color=${color}
+
+else
+
+  if [ ! -f "${f320}" ]; then
+    error_exit "The externally supplied CSV data file 320 does not exist"
+  fi
+
+  if [ ! "${f320}" -nt "${f999}" ]; then
+    error_exit "The externally supplied CSV data file 320 is not newer than the last run of Zaloha"
+  fi
+
+fi
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKCLEANER' > "${f110}"
