@@ -288,12 +288,15 @@ Other options are always introduced by a double dash (--), and either have a val
    The externally supplied CSV data files 310 and/or 320 must be placed into the Zaloha metadata directory before invoking Zaloha,
    and these files must, of course, have the same format as the CSV data files that would otherwise be produced by the scripts 210 and 220.
 
+--noDirChecks   ... switch off the checks for existence of <sourceDir> and <backupDir>
+    This is useful in connection with the options "--metaDir", "--noFindSource" and/or "--noFindBackup" and "--noExec", because under such setup
+    Zaloha does not require <sourceDir> and/or <backupDir> to be available. In the extreme case, when all these options are given,
+    Zaloha operates solely on its metadata directory.
+
 --noProgress    ... suppress progress messages (less screen output)
     If both options "--noExec" and "--noProgress" are used, Zaloha does not produce any output on stdout (traditional behavior of Unics tools).
 
 --color         ... use color highlighting (can be used on terminals which support ANSI escape codes)
-
---wTest         ... (do not use in real operations) support for special testing of weird characters in filenames
 
 --lTest         ... (do not use in real operations) support for lint-testing of AWK programs
 
@@ -614,9 +617,9 @@ optimCSV=0
 metaDir=
 noFindSource=0
 noFindBackup=0
+noDirChecks=0
 noProgress=0
 color=0
-wTest=0
 lTest=0
 
 for tmpVal in "${@}"
@@ -644,9 +647,9 @@ do
     --metaDir=*)         metaDir="M${tmpVal#*=}";         shift ;;
     --noFindSource)      noFindSource=1 ;                 shift ;;
     --noFindBackup)      noFindBackup=1 ;                 shift ;;
+    --noDirChecks)       noDirChecks=1 ;                  shift ;;
     --noProgress)        noProgress=1 ;                   shift ;;
     --color)             color=1 ;                        shift ;;
-    --wTest)             wTest=1 ;                        shift ;;
     --lTest)             lTest=1 ;                        shift ;;
     *) error_exit "Unknown option: ${tmpVal}" ;;
   esac
@@ -665,7 +668,7 @@ fi
 if [ "/" != "${sourceDir: -1:1}" ]; then
     sourceDir="${sourceDir}/"
 fi
-if [ ! -d "${sourceDir}" ] && [ ${wTest} -eq 0 ]; then
+if [ ${noDirChecks} -eq 0 ] && [ ! -d "${sourceDir}" ]; then
     error_exit "<sourceDir> is not a directory"
 fi
 sourceDirAwk="${sourceDir//${BSLASHPATTERN}/${TRIPLETB}}"
@@ -697,7 +700,7 @@ fi
 if [ "/" != "${backupDir: -1:1}" ]; then
     backupDir="${backupDir}/"
 fi
-if [ ! -d "${backupDir}" ]; then
+if [ ${noDirChecks} -eq 0 ] && [ ! -d "${backupDir}" ]; then
     error_exit "<backupDir> is not a directory"
 fi
 backupDirAwk="${backupDir//${BSLASHPATTERN}/${TRIPLETB}}"
@@ -897,9 +900,9 @@ ${TRIPLET}${FSTAB}metaDirDefault${FSTAB}${metaDirDefault}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirEsc${FSTAB}${metaDirEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindSource${FSTAB}${noFindSource}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindBackup${FSTAB}${noFindBackup}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noDirChecks${FSTAB}${noDirChecks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}wTest${FSTAB}${wTest}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}lTest${FSTAB}${lTest}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findLastRunOpsFinalAwk${FSTAB}${findLastRunOpsFinalAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findSourceOpsFinalAwk${FSTAB}${findSourceOpsFinalAwk}${FSTAB}${TRIPLET}
