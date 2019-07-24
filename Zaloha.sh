@@ -179,7 +179,7 @@ Further, each shellscript has a header part where key variables for whole script
 
 The script to copy files (script 810) is the most time consuming. In some situations, copying files in parallel might speed things up.
 For that case, the 810 script contains support for parallel operation of up to 8 parallel processes. To utilize this, create 8 copies of the 810 script.
-In first copy, keep only CP1 and TOUCH1 assigned to real commands, and assign the remaining ones to empty command (:).
+In the header of the first copy, keep only CP1 and TOUCH1 assigned to real commands, and assign the remaining ones to empty command (:).
 Adjust the other copies accordingly. Then run the copies in parallel.
 
 ###########################################################
@@ -292,6 +292,13 @@ Other options are always introduced by a double dash (--), and either have a val
     This is useful in connection with the options "--metaDir", "--noFindSource" and/or "--noFindBackup" and "--noExec", because under such setup
     Zaloha does not require <sourceDir> and/or <backupDir> to be available. In the extreme case, when all these options are given,
     Zaloha operates solely on its metadata directory.
+
+--noExec1Hdr    ... do not write header to the shellscript for Exec1 (file 610)
+--noExec2Hdr    ... do not write header to the shellscript for Exec2 (file 620)
+--noExec3Hdr    ... do not write header to the shellscript for Exec3 (file 630)
+   These options can be used only together with the "--noExec" option.
+   The headers of the shellscripts for Exec1, Exec2 and Exec3 (files 610, 620 and 630) contain definitions used in their bodies.
+   Scripts without headers (i.e. bodies only) can be easily prepended by alternative headers that contain different definitions.
 
 --noProgress    ... suppress progress messages (less screen output)
     If both options "--noExec" and "--noProgress" are used, Zaloha does not produce any output on stdout (traditional behavior of Unics tools).
@@ -618,6 +625,9 @@ metaDir=
 noFindSource=0
 noFindBackup=0
 noDirChecks=0
+noExec1Hdr=0
+noExec2Hdr=0
+noExec3Hdr=0
 noProgress=0
 color=0
 lTest=0
@@ -648,6 +658,9 @@ do
     --noFindSource)      noFindSource=1 ;                 shift ;;
     --noFindBackup)      noFindBackup=1 ;                 shift ;;
     --noDirChecks)       noDirChecks=1 ;                  shift ;;
+    --noExec1Hdr)        noExec1Hdr=1 ;                   shift ;;
+    --noExec2Hdr)        noExec2Hdr=1 ;                   shift ;;
+    --noExec3Hdr)        noExec3Hdr=1 ;                   shift ;;
     --noProgress)        noProgress=1 ;                   shift ;;
     --color)             color=1 ;                        shift ;;
     --lTest)             lTest=1 ;                        shift ;;
@@ -780,6 +793,19 @@ metaDirEsc="${metaDir//${TAB}/${TRIPLETT}}"
 metaDirEsc="${metaDirEsc//${NLINE}/${TRIPLETN}}"
 
 ###########################################################
+if [ ${noExec1Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
+    error_exit "Option --noExec1Hdr can be used only together with option --noExec"
+fi
+
+if [ ${noExec2Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
+    error_exit "Option --noExec2Hdr can be used only together with option --noExec"
+fi
+
+if [ ${noExec3Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
+    error_exit "Option --noExec3Hdr can be used only together with option --noExec"
+fi
+
+###########################################################
 if [ ! -d "${metaDir}" ]; then
   mkdir -p "${metaDir}"
 fi
@@ -901,6 +927,9 @@ ${TRIPLET}${FSTAB}metaDirEsc${FSTAB}${metaDirEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindSource${FSTAB}${noFindSource}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindBackup${FSTAB}${noFindBackup}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noDirChecks${FSTAB}${noDirChecks}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noExec1Hdr${FSTAB}${noExec1Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noExec2Hdr${FSTAB}${noExec2Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noExec3Hdr${FSTAB}${noExec3Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}lTest${FSTAB}${lTest}${FSTAB}${TRIPLET}
@@ -1787,15 +1816,17 @@ BEGIN {
   FS = FSTAB
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, backupDir )
-  BIN_BASH
-  print "backupDir='" backupDir "'"
-  print "RMDIR='rmdir'"
-  print "RM='rm -f'"
-  if ( 0 == noExec ) {
-    print "BASH_XTRACEFD=1"
-    print "PS4='    '"
-    print "set -e"
-    print "set -x"
+  if ( 0 == noExec1Hdr ) {
+    BIN_BASH
+    print "backupDir='" backupDir "'"
+    print "RMDIR='rmdir'"
+    print "RM='rm -f'"
+    if ( 0 == noExec ) {
+      print "BASH_XTRACEFD=1"
+      print "PS4='    '"
+      print "set -e"
+      print "set -x"
+    }
   }
   SECTION_LINE
 }
@@ -1824,6 +1855,7 @@ awk ${awkLint}                              \
     -f "${f410}"                            \
     -v backupDir="${backupDirAwk}"          \
     -v noExec=${noExec}                     \
+    -v noExec1Hdr=${noExec1Hdr}             \
     "${f510}"                               > "${f610}"
 
 stop_progress
@@ -1837,33 +1869,35 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, sourceDir )
   gsub( QUOTEREGEX, QUOTEESC, backupDir )
-  BIN_BASH
-  print "sourceDir='" sourceDir "'"
-  print "backupDir='" backupDir "'"
-  print "MKDIR='mkdir'"
-  if ( 1 == touch ) {
-    print "CP='cp'"
-    print "TOUCH='touch -r'"
-  } else {
-    print "CP='cp --preserve=timestamps'"
-  }
-  if ( 0 == noUnlink ) {
-    print "RM='rm -f'"
-  }
-  if ( 1 == pUser ) {
-    print "CHOWN='chown'"
-  }
-  if ( 1 == pGroup ) {
-    print "CHGRP='chgrp'"
-  }
-  if ( 1 == pMode ) {
-    print "CHMOD='chmod'"
-  }
-  if ( 0 == noExec ) {
-    print "BASH_XTRACEFD=1"
-    print "PS4='    '"
-    print "set -e"
-    print "set -x"
+  if ( 0 == noExec2Hdr ) {
+    BIN_BASH
+    print "sourceDir='" sourceDir "'"
+    print "backupDir='" backupDir "'"
+    print "MKDIR='mkdir'"
+    if ( 1 == touch ) {
+      print "CP='cp'"
+      print "TOUCH='touch -r'"
+    } else {
+      print "CP='cp --preserve=timestamps'"
+    }
+    if ( 0 == noUnlink ) {
+      print "RM='rm -f'"
+    }
+    if ( 1 == pUser ) {
+      print "CHOWN='chown'"
+    }
+    if ( 1 == pGroup ) {
+      print "CHGRP='chgrp'"
+    }
+    if ( 1 == pMode ) {
+      print "CHMOD='chmod'"
+    }
+    if ( 0 == noExec ) {
+      print "BASH_XTRACEFD=1"
+      print "PS4='    '"
+      print "set -e"
+      print "set -x"
+    }
   }
   SECTION_LINE
 }
@@ -1943,6 +1977,7 @@ awk ${awkLint}                              \
     -v pUser=${pUser}                       \
     -v pGroup=${pGroup}                     \
     -v pMode=${pMode}                       \
+    -v noExec2Hdr=${noExec2Hdr}             \
     "${f520}"                               > "${f620}"
 
 stop_progress
@@ -1956,36 +1991,38 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, sourceDir )
   gsub( QUOTEREGEX, QUOTEESC, backupDir )
-  BIN_BASH
-  print "sourceDir='" sourceDir "'"
-  print "backupDir='" backupDir "'"
-  print "MKDIR='mkdir'"
-  if ( 1 == touch ) {
-    print "CP='cp'"
-    print "TOUCH='touch -r'"
-  } else {
-    print "CP='cp --preserve=timestamps'"
-  }
-  if ( 1 == pRevUser ) {
-    print "CHOWN='chown'"
-  }
-  if ( 1 == pRevGroup ) {
-    print "CHGRP='chgrp'"
-  }
-  if ( 1 == pRevMode ) {
-    print "CHMOD='chmod'"
-  }
-  print "function rev_exists_err {"
-  print "  echo \"Zaloha: Object exists on <sourceDir> (excluded by <findSourceOps> ?): $1\" >&2"
-  if ( 0 == noExec ) {
-    print "  exit 1"
-  }
-  print "}"
-  if ( 0 == noExec ) {
-    print "BASH_XTRACEFD=1"
-    print "PS4='    '"
-    print "set -e"
-    print "set -x"
+  if ( 0 == noExec3Hdr ) {
+    BIN_BASH
+    print "sourceDir='" sourceDir "'"
+    print "backupDir='" backupDir "'"
+    print "MKDIR='mkdir'"
+    if ( 1 == touch ) {
+      print "CP='cp'"
+      print "TOUCH='touch -r'"
+    } else {
+      print "CP='cp --preserve=timestamps'"
+    }
+    if ( 1 == pRevUser ) {
+      print "CHOWN='chown'"
+    }
+    if ( 1 == pRevGroup ) {
+      print "CHGRP='chgrp'"
+    }
+    if ( 1 == pRevMode ) {
+      print "CHMOD='chmod'"
+    }
+    print "function rev_exists_err {"
+    print "  echo \"Zaloha: Object exists on <sourceDir> (excluded by <findSourceOps> ?): $1\" >&2"
+    if ( 0 == noExec ) {
+      print "  exit 1"
+    }
+    print "}"
+    if ( 0 == noExec ) {
+      print "BASH_XTRACEFD=1"
+      print "PS4='    '"
+      print "set -e"
+      print "set -x"
+    }
   }
   SECTION_LINE
 }
@@ -2059,6 +2096,7 @@ if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
       -v pRevUser=${pRevUser}                 \
       -v pRevGroup=${pRevGroup}               \
       -v pRevMode=${pRevMode}                 \
+      -v noExec3Hdr=${noExec3Hdr}             \
       "${f530}"                               > "${f630}"
 
   stop_progress
