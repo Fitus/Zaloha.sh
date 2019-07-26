@@ -470,8 +470,10 @@ The only exception are <findSourceOps> and <findGeneralOps>, which may contain t
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single quotes are disruptors. As a solution, the '"'"' quoting technique is used.
 
-In the CSV files 300 through 500, slashes are appended to file's paths. This is to ensure correct sort ordering of directories relative to their children.
-Imagine what would happen otherwise: Given dir and dir!, they would be sort ordered: dir, dir!, dir!/children, dir/children.
+In the CSV data files 330 through 500 (i.e. those which undergo the sorts) slashes are appended to file's paths and all slashes are then converted to ///s.
+This is to ensure correct sort ordering. Imagine the ordering bugs which would happen otherwise:
+  Case 1: given dir and dir!, they would be sort ordered: dir, dir!, dir!/subdir, dir/subdir.
+  Case 2: given dir and dir<tab>ectory, they would be sort ordered: dir/!subdir1, dir///tectory, dir/subdir2.
 
 Zaloha does not contain any explicit handling of national characters in filenames (= characters above ASCII 127).
 It is assumed that the commands used by Zaloha handle them transparently (which should be tested on environments where national characters are used in filenames).
@@ -966,15 +968,19 @@ BEGIN {
   gsub( /TAB/, "\"\\t\"" )
   gsub( /NLINE/, "\"\\n\"" )
   gsub( /BSLASH/, "\"\\\\\"" )
+  gsub( /SLASHREGEX/, "/\\//" )
+  gsub( /SLASH/, "\"/\"" )
   gsub( /DQUOTE/, "\"\\\"\"" )
   gsub( /TRIPLETTREGEX/, "/\\/\\/\\/t/" )
   gsub( /TRIPLETNREGEX/, "/\\/\\/\\/n/" )
   gsub( /TRIPLETBREGEX/, "/\\/\\/\\/b/" )
+  gsub( /TRIPLETSREGEX/, "/\\/\\/\\/s/" )
   gsub( /TRIPLETDSEPLENGTH/, "5" )
   gsub( /TRIPLETDSEP/, "\"///d/\"" )
   gsub( /TRIPLETT/, "\"///t\"" )
   gsub( /TRIPLETN/, "\"///n\"" )
   gsub( /TRIPLETC/, "\"///c\"" )
+  gsub( /TRIPLETS/, "\"///s\"" )
   gsub( /TRIPLET/, "\"///\"" )
   gsub( /QUOTEREGEX/, "/'/" )
   gsub( /QUOTEESC/, "\"'\\\"'\\\"'\"" )
@@ -1111,7 +1117,7 @@ BEGIN {
   cmd = cmd "\\t%u"                    # column 10: file's user name
   cmd = cmd "\\t%g"                    # column 11: file's group name
   cmd = cmd "\\t%m"                    # column 12: file's permission bits (in octal)
-  cmd = cmd "\\t%P/"                   # column 13: file's path with <sourceDir> or <backupDir> stripped, slash appended
+  cmd = cmd "\\t%P"                    # column 13: file's path with <sourceDir> or <backupDir> stripped
   cmd = cmd "\\t" TRIPLET              # column 14: terminator field
   cmd = cmd "\\t%l"                    # column 15: object of symbolic link
   cmd = cmd "\\t" TRIPLET              # column 16: terminator field
@@ -1206,17 +1212,29 @@ BEGIN {
   OFS = FSTAB
   fin = 1      # field index in output record
   fpr = 0      # flag field in progress
+  fne = 0      # flag field not empty
+  rec = ""     # output record
+}
+function add_fragment_to_field( fragment, verbatim ) {
+  if ( "" != fragment ) {
+    fne = 1
+  }
+  if (( 13 == fin ) && ( 0 == verbatim )) {             # in field 13, convert slashes to TRIPLETS
+    gsub( SLASHREGEX, TRIPLETS, fragment )
+  }
+  rec = rec fragment
 }
 {
-  if (( 1 == fin ) && ( 16 == NF ) && ( TRIPLET == $1 ) && ( TRIPLET == $16 )) {
-    if ( "/" == $13 ) {
-      $13 = ""                                          # top-level directories must have no slash appended
+  if (( 1 == fin ) && ( 16 == NF ) && ( TRIPLET == $1 ) && ( TRIPLET == $16 )) {   ## the unproblematic case performance-optimized
+    if ( "" != $13 ) {
+      $13 = $13 SLASH
+      gsub( SLASHREGEX, TRIPLETS, $13 )
     }
-    print                                               # the unproblematic case performance-optimized
-  } else {                                              # full processing otherwise
+    print
+  } else {                                                                         ## full processing otherwise
     if ( 0 == NF ) {
       if ( 1 == fpr ) {
-        rec = rec TRIPLETN
+        add_fragment_to_field( TRIPLETN, 1 )
       } else {
         error_exit( "Unexpected blank line in raw output of FIND" )
       }
@@ -1227,24 +1245,34 @@ BEGIN {
         }
         if ( 1 == fpr ) {
           if ( TRIPLET == $i ) {
-            rec = rec FSTAB $i
+            if (( 13 == fin ) && ( 1 == fne )) {        # append TRIPLETS to field 13 (if field 13 is not empty)
+              add_fragment_to_field( TRIPLETS, 1 )
+            }
+            rec = rec FSTAB TRIPLET
             fin = fin + 2
             fpr = 0
+            fne = 0
           } else if ( 1 == i ) {
-            rec = rec TRIPLETN $i
+            add_fragment_to_field( TRIPLETN, 1 )
+            add_fragment_to_field( $i, 0 )
           } else {
-            rec = rec TRIPLETT $i
+            add_fragment_to_field( TRIPLETT, 1 )
+            add_fragment_to_field( $i, 0 )
           }
         } else {
-          if ( 1 == fin ) {
-            rec = $i                                    # output record
+          if ( 1 == fin ) {                             # field 1 starts a record
+            add_fragment_to_field( $i, 0 )
             fin = 2
-          } else if (( 13 == fin ) || ( 15 == fin )) {  # fields delimited by subsequent terminator fields
-            rec = rec FSTAB $i
+            fne = 0
+          } else if (( 13 == fin ) || ( 15 == fin )) {  # fields 13 and 15 are delimited by subsequent terminator fields
+            rec = rec FSTAB
+            add_fragment_to_field( $i, 0 )
             fpr = 1
-          } else {
-            rec = rec FSTAB $i
+          } else {                                      # other fields are regular
+            rec = rec FSTAB
+            add_fragment_to_field( $i, 0 )
             fin = fin + 1
+            fne = 0
           }
         }
         if (( NF == i ) && ( TRIPLET == $i ) && (( 17 != fin ) || ( 0 != fpr ))) {
@@ -1254,6 +1282,7 @@ BEGIN {
     }
     if ( 17 == fin ) {                                  # 17 = field index of last field + 1
       print rec
+      rec = ""
       fin = 1
     }
   }
@@ -1326,7 +1355,7 @@ BEGIN {
   if ( $12 !~ NUMBERREGEX ) {
     error_exit( "Unexpected, column 12 of cleaned file is not numeric" )
   }
-  if ((( $13 == "" ) && ( 1 != FNR )) || ( $13 == "/" )) {
+  if (( $13 == "" ) && ( 1 != FNR )) {
     error_exit( "Unexpected, column 13 of cleaned file is empty" )
   }
   if ( $14 != TRIPLET ) {
@@ -1388,7 +1417,11 @@ BEGIN {
       error_exit( "Unexpected falsely detected hardlink (mode differs)" )
     }
     $3 = "h"    # hardlink
-    $15 = substr( pt, 1, length( pt ) - 1 )  # object of hardlink
+    $15 = pt    # object of hardlink
+    if ( "" != $15 ) {
+      gsub( TRIPLETSREGEX, SLASH, $15 )
+      $15 = substr( $15, 1, length( $15 ) - 1 )
+    }
   } else {
     hcn = 1     # detected hardlink count
     tp = $3     # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
@@ -1400,7 +1433,7 @@ BEGIN {
     us = $10    # previous record's column 10: file's user name
     gr = $11    # previous record's column 11: file's group name
     md = $12    # previous record's column 12: file's permission bits (in octal)
-    pt = $13    # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped, slash appended
+    pt = $13    # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
   }
   print
 }
@@ -1665,7 +1698,7 @@ function process_previous_record() {
   us = $10      # previous record's column 10: file's user name
   gr = $11      # previous record's column 11: file's group name
   md = $12      # previous record's column 12: file's permission bits (in octal)
-  pt = $13      # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped, slash appended
+  pt = $13      # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
   ol = $15      # previous record's column 15: object of symbolic link
 }
 END {
@@ -1720,7 +1753,10 @@ BEGIN {
 }
 function print_split() {
   if ( $2 ~ /^(RMDIR|REMOVE)/ ) {
-    $13 = substr( $13, 1, length( $13 ) - 1 )
+    if ( "" != $13 ) {
+      gsub( TRIPLETSREGEX, SLASH, $13 )
+      $13 = substr( $13, 1, length( $13 ) - 1 )
+    }
     print > f510
   } else {
     print > f500
@@ -1783,6 +1819,7 @@ BEGIN {
 }
 {
   if ( "" != $13 ) {
+    gsub( TRIPLETSREGEX, SLASH, $13 )
     $13 = substr( $13, 1, length( $13 ) - 1 )
   }
   if ( $2 ~ /^(MKDIR|NEW|UPDATE|unl\.UP|ATTR)/ ) {
