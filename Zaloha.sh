@@ -50,7 +50,7 @@ Such limitations are (e.g. in case of ext4 -> FAT32): not allowed characters in 
 
 No writing on either directory may occur while Zaloha runs (no file locking is implemented).
 In demanding IT operations where backup must run concurrently with writing, a higher class of backup solution should be deployed,
-like storage snapshots (must be supported by underlying OS/hardware).
+like storage snapshots (i.e. functionality that must be provided by the underlying OS/hardware).
 
 Handling of "weird" characters in filenames was a special focus during development of Zaloha (details below).
 
@@ -125,8 +125,10 @@ Zaloha contains an optional feature to detect multiply linked (hardlinked) files
 If this feature is switched on (via the "--hLinks" option), Zaloha internally flags the second, third, etc. links to same file as "hardlinks",
 and synchronizes to <backupDir> only the first link (the "file"). The "hardlinks" are not synchronized to <backupDir>, but Zaloha prepares a restore script
 in its metadata directory. If this feature is switched off (no "--hLinks" option), then each link to a multiply linked file is treated as a separate regular file.
-Use this feature only on filesystems of <sourceDir> which support hardlinks and for which the inode-deduplication is known to work correctly (NTFS, ext4).
-Please be cautious because inode-related issues exist on some filesystems and network-mounted filesystems.
+Two risks exist: Zaloha might not detect that a file is in fact a hardlink, or Zaloha might falsely detect a hardlink while the file is in fact a unique file.
+The second risk is more severe, because the contents of the unique file will not be synchronized to <backupDir> in such case. For that reason, Zaloha contains
+additional checks against falsely detected hardlinks (see code of AWKHLINKS). Generally, use this feature only after proper testing on your filesystems.
+Please be cautious as inode-related issues exist on some filesystems and network-mounted filesystems.
 
 Zaloha does not synchronize other types of objects on <sourceDir> (named pipes, sockets, special devices, etc).
 These objects are considered to be part of the operating system or parts of applications, and dedicated scripts for their (re-)creation should exist.
@@ -160,15 +162,16 @@ Zaloha creates a metadata directory: <backupDir>/.Zaloha_metadata. The location 
 The purposes of individual files in that directory are described in a separate section below. Briefly, the metadata directory is used for:
 
  - AWK program files (produced from "here documents" in Zaloha)
+ - Shellscripts to run FIND commands
  - CSV metadata files
  - Exec1/2/3 shellscripts
- - restore shellscripts
- - touchfile marking execution of actions
+ - Shellscripts for the case of restore
+ - Touchfile marking execution of actions
 
 Files persist in the metadata directory until the next invocation of Zaloha.
 
 To obtain information about what Zaloha did (counts of removed/copied files, total counts, etc), do not parse the screen output, but query the CSV metadata files.
-Query the CSV files after AWKCLEANER. Do not query the raw CSV outputs of FIND commands (before AWKCLEANER) and the produced shellscripts,
+Query the CSV metadata files after AWKCLEANER. Do not query the raw CSV outputs of FIND commands (before AWKCLEANER) and the produced shellscripts,
 because due to eventual newlines in filenames, they may contain multiple lines per "record".
 
 Shellscripts for case of restore
@@ -177,7 +180,8 @@ Zaloha prepares shellscripts for the case of restore in its metadata directory (
 Each type of operation is contained in a separate shellscript, to give maximum freedom (= for each script, decide whether to apply or to not apply).
 Further, each shellscript has a header part where key variables for whole script are defined (and can be adjusted as needed).
 
-The script to copy files (script 810) is the most time consuming. In some situations, copying files in parallel might speed things up.
+The script to copy files (script 810) needs (as the only one) access to both directories, and is expected to be the most time consuming.
+In some situations, copying files in parallel might speed things up (especially when many small files should be copied over a network).
 For that case, the 810 script contains support for parallel operation of up to 8 parallel processes. To utilize this, create 8 copies of the 810 script.
 In the header of the first copy, keep only CP1 and TOUCH1 assigned to real commands, and assign the remaining ones to empty command (:).
 Adjust the other copies accordingly. Then run the copies in parallel.
@@ -188,9 +192,9 @@ INVOCATION
 
 Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 
---sourceDir=<sourceDir> is mandatory. <sourceDir> must exist, otherwise Zaloha throws an error.
+--sourceDir=<sourceDir> is mandatory. <sourceDir> must exist, otherwise Zaloha throws an error (except the "--noDirChecks" option is given).
 
---backupDir=<backupDir> is mandatory. <backupDir> must exist, otherwise Zaloha throws an error.
+--backupDir=<backupDir> is mandatory. <backupDir> must exist, otherwise Zaloha throws an error (except the "--noDirChecks" option is given).
 
 Other options are always introduced by a double dash (--), and either have a value, or are options without a value:
 
@@ -212,14 +216,14 @@ Other options are always introduced by a double dash (--), and either have a val
     then Zaloha evaluates the file on <backupDir> as obsolete (= removes it). Compare this with <findGeneralOps> (see below).
 
     Although <findSourceOps> consists of multiple words, it is passed in as a single string (= enclose it in double-quotes or single-quotes in your shell).
-    Zaloha contains a special parser (AWKPARSER) to split it into separate words (arguments for the FIND command).
+    Zaloha contains a special parser (AWKPARSER) that splits it into separate words (arguments for the FIND command).
     If a pattern (word) in <findSourceOps> contains spaces, enclose it in double-quotes. Note: to protect the double-quotes from your shell, use \".
     If a pattern (word) in <findSourceOps> itself contains a double quote, use \". Note: to protect the backslash and the double-quote from your shell, use \\\".
 
     Please note that in the patterns of the -path and -name operands, FIND itself interprets following characters specially (see FIND documentation): *, ?, [, ], \.
     If these characters are to be taken literally, they must be backslash-escaped. Again, take care of protecting backslashes from your shell.
 
-    <findSourceOps> may contain the placeholder ///d/ for <sourceDir> (more precisely, <sourceDir> followed by directory separator and properly escaped,
+    <findSourceOps> may contain the placeholder ///d/ for <sourceDir> (more precisely, <sourceDir> followed by the directory separator and properly escaped,
     double-quoted and eventually prepended by "./" for use in FIND patterns).
 
     Example: exclude directory <sourceDir>/.git, all directories Windows Security and all files My "Secret" Things (double-quoted and single-quoted versions):
@@ -233,13 +237,13 @@ Other options are always introduced by a double dash (--), and either have a val
 
     <sourceDir or backupDir>/$RECYCLE.BIN               ... Windows Recycle Bin (assumed to exist directly under <sourceDir> or <backupDir>)
     <sourceDir or backupDir>/.Trash_<number>*           ... Linux Trash (assumed to exist directly under <sourceDir> or <backupDir>)
-    <sourceDir or backupDir>/lost+found                 ... Linux lost filesystem fragments (assumed to exist directly under <sourceDir> or <backupDir>)
+    <sourceDir or backupDir>/lost+found                 ... Linux lost + found filesystem fragments (assumed to exist directly under <sourceDir> or <backupDir>)
 
     The placeholder ///d/ is for <sourceDir> or <backupDir>, depending on the actual search.
-    To extend (= combine, not replace) the internally defined <findGeneralOps> with own extension, pass in own extension prepended by plus sign ("+").
+    To extend (= combine, not replace) the internally defined <findGeneralOps> with own extension, pass in own extension prepended by the plus sign ("+").
 
 --noExec        ... needed if Zaloha is invoked automatically: do not ask, do not execute the actions, but still prepare the scripts.
-    The prepared scripts do not contain shell tracing and they do not contain the "set -e" instruction. This means that the scripts ignore individual failed commands
+    The prepared scripts then do not contain shell tracing and they do not contain the "set -e" instruction. This means that the scripts ignore individual failed commands
     and try to do as much work as possible, which is a behavior different from the interactive regime, where scripts are traced and halt on the first error.
 
 --revNew        ... activate REV.NEW (= if standalone file on <backupDir> is newer than the last run of Zaloha, reverse-copy it to <sourceDir>)
@@ -280,17 +284,17 @@ Other options are always introduced by a double dash (--), and either have a val
     In such cases, FIND operands to exclude the metadata directory from the FIND searches must be explicitly passed in via <findGeneralOps>.
     If Zaloha is used to synchronize multiple directories, then each such instance of Zaloha must have its own separate metadata directory.
 
---noFindSource  ... do not run FIND (script 210) to search <sourceDir>, and use externally supplied CSV data file 310 instead
---noFindBackup  ... do not run FIND (script 220) to search <backupDir>, and use externally supplied CSV data file 320 instead
-   Use these options if you have better (especially performance-wise) methods for obtaining the CSV data files 310 and/or 320.
+--noFindSource  ... do not run FIND (script 210) to search <sourceDir>, and use externally supplied CSV metadata file 310 instead
+--noFindBackup  ... do not run FIND (script 220) to search <backupDir>, and use externally supplied CSV metadata file 320 instead
+   Use these options if you have better (especially performance-wise) methods for obtaining the CSV metadata files 310 and/or 320.
    For instance, if <sourceDir> and/or <backupDir> are network-mounted directories, running FIND commands on them might be slow.
-   Running FIND directly on the file server (e.g. via SSH) and downloading the resulting CSV data file should be much quicker.
-   The externally supplied CSV data files 310 and/or 320 must be placed into the Zaloha metadata directory before invoking Zaloha,
-   and these files must, of course, have the same format as the CSV data files that would otherwise be produced by the scripts 210 and 220.
+   Running FIND directly on the file server (e.g. via SSH) and downloading the resulting CSV metadata file should be much quicker.
+   The externally supplied CSV metadata files 310 and/or 320 must be placed into the Zaloha metadata directory before invoking Zaloha,
+   and these files must, of course, have the same format as the CSV metadata files that would otherwise be produced by the scripts 210 and 220.
 
 --noDirChecks   ... switch off the checks for existence of <sourceDir> and <backupDir>
     This is useful in connection with the options "--metaDir", "--noFindSource" and/or "--noFindBackup" and "--noExec", because under such setup
-    Zaloha does not require <sourceDir> and/or <backupDir> to be available. In the extreme case, when all these options are given,
+    Zaloha does not require <sourceDir> and/or <backupDir> to be accessible. In the extreme case, when all these options are given,
     Zaloha operates solely on its metadata directory.
 
 --noExec1Hdr    ... do not write header to the shellscript for Exec1 (file 610)
@@ -322,7 +326,7 @@ In case of failure: resolve the problem and re-run Zaloha with same parameters.
 In the second run, Zaloha should not repeat the actions completed by the first run: it should continue from the action on which the first run failed.
 If the first run completed successfully, no actions should be performed in the second run (this is an important test case, see below).
 
-Typically, Zaloha is invoked by a wrapper script that does the necessary directory mounts, then runs Zaloha with the required parameters, then directory unmounts.
+Typically, Zaloha is invoked from a wrapper script that does the necessary directory mounts, then runs Zaloha with the required parameters, then directory unmounts.
 
 ###########################################################
 
@@ -330,7 +334,7 @@ TESTING, DEPLOYMENT, INTEGRATION
 
 First, test Zaloha on a small and noncritical set of your data. Although Zaloha has been tested on several environments, it can happen that Zaloha malfunctions on
 your environment due to different behavior of the operating system, bash, FIND, SORT, AWK and other utilities. Perform tests in the interactive regime first.
-If Zaloha prepares wrong actions, abort to skip the executions.
+If Zaloha prepares wrong actions, abort it at the next prompt.
 
 After first synchronization, an important test is to run second synchronization, which should execute no actions, as the directories should be already synchronized.
 
@@ -350,7 +354,7 @@ Nonzero exit status and writes to standard error must be brought to attention an
 The scripts prepared under the "--noExec" option do not halt on the first error, also their zero exit status does not imply that there were no failed individual commands.
 
 Implement sanity checks to avoid data disasters like synchronizing <sourceDir> to <backupDir> in the moment when <sourceDir> is unmounted, which would lead
-to loss of backup data. Evaluate counts of actions prepared by Zaloha (count records in CSV files in Zaloha metadata directory). Abort the process if the
+to loss of backup data. Evaluate counts of actions prepared by Zaloha (count records in CSV metadata files in Zaloha metadata directory). Abort the process if the
 action counts exceed sanity thresholds defined by you, e.g. when Zaloha prepares an unexpectedly high number of removals.
 
 The process which invokes Zaloha in automatic regime should function as follows (pseudocode):
@@ -375,16 +379,16 @@ SPECIAL AND CORNER CASES
 To detect which files need synchronization, Zaloha compares file sizes and modification times. If the file sizes differ, synchronization is needed.
 The modification time is more tricky: Zaloha tolerates +/- 1 second differences, due to FAT32 rounding to the nearest 2 seconds.
 In some situations, it is necessary to tolerate differences of exactly +/- 1 hour (+/- 3600 seconds) as well (to be activated via the "--ok3600s" option).
-Typically, this occurs when one of the directories is on a filesystem type which does not store timezones together with modification times (e.g. FAT32),
-and the OS cannot derive the timezones on-the-fly due to some incorrect setup.
+Typically, this occurs when one of the directories is on a filesystem type that stores modification times not in universal time but in local time (e.g. FAT32),
+and the OS is not able, for some reason, to correctly reflect the switching of daylight saving time while converting the local time.
 
 The +/- 1 hour differences, tolerable via the "--ok3600s" option, are assumed to exist between <sourceDir> and <backupDir>, but not between <backupDir> and <metaDir>.
-This point is relevant especially if <metaDir> is located outside of <backupDir> (via the "--metaDir" option).
+This is relevant especially if <metaDir> is located outside of <backupDir> (via the "--metaDir" option).
 
-It is possible (but not recommended) for <backupDir> to be a subdirectory of <sourceDir> or vice versa.
+It is possible (but not recommended) for <backupDir> to be a subdirectory of <sourceDir> and vice versa.
 In such cases, conditions to avoid recursive copying must be passed in via <findGeneralOps>.
 
-The SORT commands are run under the LC_ALL=C environment variable, to avoid a problem caused by some locales that ignore slashes and other punctuations during sorting.
+The SORT commands are run under the LC_ALL=C environment variable, to avoid problems caused by some locales that ignore slashes and other punctuations during sorting.
 
 In some situations (e.g. Linux Samba + Linux Samba client), cp --preserve=timestamps does not preserve modification timestamps (unless on empty files).
 In that case, Zaloha should be instructed (via the "--touch" option) to use subsequent touch commands instead, which is a more robust solution.
@@ -393,7 +397,7 @@ In the scripts for case of restore, touch commands are used unconditionally.
 Corner case REV.NEW + namespace on <sourceDir> needed for REV.MKDI or REV.NEW action is occupied by object of conflicting type:
 The file on <backupDir> will not be reverse-copied to <sourceDir>, but removed. As this file is newer than the last run of Zaloha, the action will be REMOVE.!.
 
-Corner case REV.NEW + <findSourceOps>: If the same file exists on both <sourceDir> and <backupDir>, and on <sourceDir> that file is excluded by <findSourceOps>
+Corner case REV.NEW + <findSourceOps>: If the same file exists on both <sourceDir> and <backupDir>, and on <sourceDir> that file is masked by <findSourceOps>
 and on <backupDir> that file is newer than the last run of Zaloha, REV.NEW on that file will be prepared. This is an error which Zaloha is unable to detect.
 Hence, the shellscript for Exec3 contains a test that throws an error in such situation.
 
@@ -403,7 +407,7 @@ The implemented solution for that case is that for REV.UP, the <backupDir> file 
 Corner case REV.UP + hardlinked file: Reverse-updating a multiply linked (hardlinked) file on <sourceDir> may lead to follow-up effects.
 
 Corner case REV.UP + "--hLinks": If hardlink detection on <sourceDir> is active ("--hLinks" option), then Zaloha supports reverse-update of only the first link
-on <sourceDir> (the one that stays tagged as "file" (f) in CSV data after AWKHLINKS).
+on <sourceDir> (the one that stays tagged as "file" (f) in CSV metadata after AWKHLINKS).
 
 Corner case if directory .Zaloha_metadata exists under <sourceDir> as well (e.g. in case of backups of backups): It will be ignored. If a backup of that directory
 is needed as well, it should be solved separately (Hint: if the secondary backup starts one directory higher, then .Zaloha_metadata of the original backup will be taken).
@@ -416,17 +420,17 @@ Handling and checking of input parameters should be self-explanatory.
 
 The actual program logic is embodied in AWK programs, which are contained in Zaloha as "here documents".
 
-The AWK program AWKPARSER parses the FIND arguments assembled from <findSourceOps> and <findGeneralOps> and constructs the FIND commands.
-The outputs of these FIND commands are tab-separated CSV files that contain all data needed for following steps.
-These CSV files, however, must first be processed by AWKCLEANER to handle (escape) eventual tabs and newlines in filenames.
+The AWK program AWKPARSER parses the FIND operands assembled from <findSourceOps> and <findGeneralOps> and constructs the FIND commands.
+The outputs of running these FIND commands are tab-separated CSV metadata files that contain all information needed for following steps.
+These CSV metadata files, however, must first be processed by AWKCLEANER to handle (escape) eventual tabs and newlines in filenames.
 
-The cleaned CSV files are then checked by AWKCHECKER for unexpected deviations (in which case an error is thrown and the processing stops).
+The cleaned CSV metadata files are then checked by AWKCHECKER for unexpected deviations (in which case an error is thrown and the processing stops).
 
-The next (optional) step is to detect hardlinks: the CSV file from <sourceDir> is sorted by device number + inode number. This means that multiply-linked files
+The next (optional) step is to detect hardlinks: the CSV metadata file from <sourceDir> is sorted by device number + inode number. This means that multiply-linked files
 will be in adjacent records. The AWK program AWKHLINKS evaluates this situation: The type of the first link will be kept as "file" (f),
 the types of the other links will be changed to "hardlinks" (h).
 
-Then comes the core function of Zaloha. The CSV files from <sourceDir> and <backupDir> will be united and sorted by filename and the <sourceDir>/<backupDir> indicator.
+Then comes the core function of Zaloha. The CSV metadata files from <sourceDir> and <backupDir> will be united and sorted by filename and the <sourceDir>/<backupDir> indicator.
 This means that objects existing in both directories will be in adjacent records, with the <backupDir> record coming first.
 The AWK program AWKDIFF evaluates this situation (as well as records from objects existing in only one of the directories), and writes target state
 of synchronized directories with actions to reach that target state.
@@ -442,41 +446,42 @@ TECHNIQUES FOR HANDLING OF WEIRD CHARACTERS IN FILENAMES
 
 Handling of "weird" characters in filenames was a special focus during development of Zaloha.
 Actually, it was an exercise of how far can be gone with shellscript alone, without reverting to a C program.
-Tested were: !"#$%&'()*+,-.:;<=>?@[\]^`{|}~, spaces, tabs, newlines, alert (bell) and few national characters (above ASCII 127).
+Tested were: !"#$%&'()*+,-.:;<=>?@[\]^`{|}~, spaces, tabs, newlines, alert (bell) and a few national characters (above ASCII 127).
 Please note that on some filesystem types, some weird characters are not allowed at all.
 
-Zaloha internally uses tab-separated CSV files, also tabs and newlines are major disruptors. The solution is based on following idea:
+Zaloha internally uses tab-separated CSV files, also tabs and newlines are major disruptors. The solution is based on the following idea:
 POSIX (the most "liberal" standard under which Zaloha must function) says that filenames may contain all characters except slash (/, the directory separator)
-and ASCII NUL. Hence, no character except these two can be used as an escape character. Also, let us have a look at the directory separator itself:
-It cannot occur inside of filenames, and it separates file and directory names in the paths. As filenames cannot have zero length, no two slashes can appear in sequence.
+and ASCII NUL. Hence, except these two, no character can be used as an escape character (if we do not want to introduce some re-coding).
+Further, ASCII NUL is unsuitable, as it is widely used as a string delimiter. Then, let's have a look at the directory separator itself:
+It cannot occur inside of filenames. It separates file and directory names in the paths. As filenames cannot have zero length, no two slashes can appear in sequence.
 The only exception is the naming convention for network-mounted directories, which may contain two consecutive slashes at the beginning.
 But three consecutive slashes (a triplet ///) are impossible. Hence, it is a waterproof escape sequence.
-This opens the way to represent a tab as ///t and newline as ///n.
+This opens the way to represent a tab as ///t and a newline as ///n.
 
 For display of filenames on terminal (and only there), control characters (other than tabs and newlines) are displayed as ///c, to avoid terminal disruption.
-(Such control characters are still original in the CSV files).
+(Such control characters are still original in the CSV metadata files).
 
-Further, /// are used as leading fields in the CSV files, to allow easy separation of record lines from continuation lines caused by newlines in filenames
+Further, /// are used as leading fields in the CSV metadata files, to allow easy separation of record lines from continuation lines caused by newlines in filenames
 (it is impossible that continuation lines have /// as the first field, because filenames cannot contain the newline + /// sequence).
 
-Finally, /// are used as terminator fields in the CSV files, to be able to determine where the filenames end in a situation when they contain tabs and newlines
+Finally, /// are used as terminator fields in the CSV metadata files, to be able to determine where the filenames end in a situation when they contain tabs and newlines
 (it is impossible that filenames produce a field containing /// alone, because filenames cannot contain the tab + /// sequence).
 
 An additional challenge is passing of variable values to AWK. During its lexical parsing, AWK interprets backslash-led escape sequences.
 To avoid this, backslashes are converted to ///b in the bash script, and ///b are converted back to backslashes in the AWK programs.
 
-Zaloha checks that no input parameters contain ///, to avoid breaking of the internal quoting rules from the outside.
+Zaloha checks that no input parameters contain ///, to avoid breaking of the internal escape logic from the outside.
 The only exception are <findSourceOps> and <findGeneralOps>, which may contain the ///d/ sequence.
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single quotes are disruptors. As a solution, the '"'"' quoting technique is used.
 
-In the CSV data files 330 through 500 (i.e. those which undergo the sorts) slashes are appended to file's paths and all slashes are then converted to ///s.
+In the CSV metadata files 330 through 500 (i.e. those which undergo the sorts) slashes are appended to file's paths and all slashes are then converted to ///s.
 This is to ensure correct sort ordering. Imagine the ordering bugs which would happen otherwise:
   Case 1: given dir and dir!, they would be sort ordered: dir, dir!, dir!/subdir, dir/subdir.
   Case 2: given dir and dir<tab>ectory, they would be sort ordered: dir/!subdir1, dir///tectory, dir/subdir2.
 
-Zaloha does not contain any explicit handling of national characters in filenames (= characters above ASCII 127).
-It is assumed that the commands used by Zaloha handle them transparently (which should be tested on environments where national characters are used in filenames).
+Zaloha does not contain any explicit handling of national characters in filenames (= characters beyond ASCII 127).
+It is assumed that the commands used by Zaloha handle them transparently (which should be tested on environments where this topic is relevant).
 <sourceDir> and <backupDir> must use the same code page for national characters in filenames, because Zaloha does not contain any code page conversions.
 
 ###########################################################
@@ -943,24 +948,30 @@ PARAMFILE
 ###########################################################
 awk ${awkLint} '{ print }' << 'AWKAWKPREPROC' > "${f100}"
 BEGIN {
-  eex = "BEGIN {\n"                                                     \
-        "  error_exit_fn = \"\"\n"                                      \
-        "}\n"                                                           \
-        "function error_exit( msg ) {\n"                                \
-        "  if ( \"\" == error_exit_fn ) {\n"                            \
-        "    if ( \"\" != FILENAME ) {\n"                               \
-        "      error_exit_fn = FILENAME\n"                              \
-        "      sub( /^.*\\//, \"\", error_exit_fn )\n"                  \
-        "      msg = \"(\" error_exit_fn \" FNR:\" FNR \") \" msg\n"    \
-        "    }\n"                                                       \
-        "    print \"\\nZaloha AWK: \" msg > \"/dev/stderr\"\n"         \
-        "    close( \"/dev/stderr\" )\n"                                \
-        "    exit 1\n"                                                  \
-        "  }\n"                                                         \
+  eex = "BEGIN {\n"                                                         \
+        "  error_exit_filename = \"\"\n"                                    \
+        "}\n"                                                               \
+        "function error_exit( msg ) {\n"                                    \
+        "  if ( \"\" == error_exit_filename ) {\n"                          \
+        "    if ( \"\" != FILENAME ) {\n"                                   \
+        "      error_exit_filename = FILENAME\n"                            \
+        "      sub( /^.*\\//, \"\", error_exit_filename )\n"                \
+        "      msg = \"(\" error_exit_filename \" FNR:\" FNR \") \" msg\n"  \
+        "    }\n"                                                           \
+        "    print \"\\nZaloha AWK: \" msg > \"/dev/stderr\"\n"             \
+        "    close( \"/dev/stderr\" )\n"                                    \
+        "    exit 1\n"                                                      \
+        "  }\n"                                                             \
+        "}"
+
+  war = "function warning( msg ) {\n"                                       \
+        "  print \"\\nZaloha AWK: Warning: \" msg > \"/dev/stderr\"\n"      \
+        "  close( \"/dev/stderr\" )\n"                                      \
         "}"
 }
 {
-  gsub( /ERROR_EXIT/, eex )
+  gsub( /DEFINE_ERROR_EXIT/, eex )
+  gsub( /DEFINE_WARNING/, war )
   gsub( /BIN_BASH/, "print \"#!/bin/bash\"" )
   gsub( /SECTION_LINE/, "print \"#\" FSTAB TRIPLET" )
   gsub( /TABREGEX/, "/\\t/" )
@@ -1032,7 +1043,7 @@ AWKACTIONS2TERM
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKPARSER' > "${f106}"
-ERROR_EXIT
+DEFINE_ERROR_EXIT
 BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, findDir )
   gsub( TRIPLETBREGEX, BSLASH, findOps )
@@ -1179,11 +1190,11 @@ if [ ${noFindSource} -eq 0 ]; then
 else
 
   if [ ! -f "${f310}" ]; then
-    error_exit "The externally supplied CSV data file 310 does not exist"
+    error_exit "The externally supplied CSV metadata file 310 does not exist"
   fi
 
   if [ ! "${f310}" -nt "${f999}" ]; then
-    error_exit "The externally supplied CSV data file 310 is not newer than the last run of Zaloha"
+    error_exit "The externally supplied CSV metadata file 310 is not newer than the last run of Zaloha"
   fi
 
 fi
@@ -1195,18 +1206,18 @@ if [ ${noFindBackup} -eq 0 ]; then
 else
 
   if [ ! -f "${f320}" ]; then
-    error_exit "The externally supplied CSV data file 320 does not exist"
+    error_exit "The externally supplied CSV metadata file 320 does not exist"
   fi
 
   if [ ! "${f320}" -nt "${f999}" ]; then
-    error_exit "The externally supplied CSV data file 320 is not newer than the last run of Zaloha"
+    error_exit "The externally supplied CSV metadata file 320 is not newer than the last run of Zaloha"
   fi
 
 fi
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKCLEANER' > "${f110}"
-ERROR_EXIT
+DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB   # FSTAB or TAB, because fields are separated both by tabs produced by FIND as well as by tabs contained in filenames
   OFS = FSTAB
@@ -1308,7 +1319,7 @@ stop_progress
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKCHECKER' > "${f130}"
-ERROR_EXIT
+DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
 }
@@ -1381,7 +1392,7 @@ stop_progress
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKHLINKS' > "${f150}"
-ERROR_EXIT
+DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
   OFS = FSTAB
@@ -1470,7 +1481,8 @@ fi
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKDIFF' > "${f170}"
-ERROR_EXIT
+DEFINE_ERROR_EXIT
+DEFINE_WARNING
 BEGIN {
   FS = FSTAB
   OFS = FSTAB
@@ -1706,8 +1718,7 @@ END {
     process_previous_record()
   }
   if ( 0 == lru ) {
-    print "\nZaloha AWK: Warning: No last run of Zaloha found (this is OK if this is the first run)" > "/dev/stderr"
-    close( "/dev/stderr" )
+    warning( "No last run of Zaloha found (this is OK if this is the first run)" )
   }
 }
 AWKDIFF
@@ -1848,7 +1859,7 @@ stop_progress
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKEXEC1' > "${f410}"
-ERROR_EXIT
+DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
@@ -1899,7 +1910,7 @@ stop_progress
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKEXEC2' > "${f420}"
-ERROR_EXIT
+DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
   gsub( TRIPLETBREGEX, BSLASH, sourceDir )
@@ -2021,7 +2032,7 @@ stop_progress
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKEXEC3' > "${f430}"
-ERROR_EXIT
+DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
   gsub( TRIPLETBREGEX, BSLASH, sourceDir )
@@ -2049,7 +2060,7 @@ BEGIN {
       print "CHMOD='chmod'"
     }
     print "function rev_exists_err {"
-    print "  echo \"Zaloha: Object exists on <sourceDir> (excluded by <findSourceOps> ?): $1\" >&2"
+    print "  echo \"Zaloha: Object exists on <sourceDir> (masked by <findSourceOps> ?): $1\" >&2"
     if ( 0 == noExec ) {
       print "  exit 1"
     }
