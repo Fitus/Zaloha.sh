@@ -1,6 +1,7 @@
 #!/bin/bash
 
-: << 'ZALOHADOCU'
+function zaloha_docu {
+  less << 'ZALOHADOCU'
 ###########################################################
 
 MIT License
@@ -29,30 +30,44 @@ SOFTWARE.
 
 OVERVIEW
 
-Zaloha is a shellscript for synchronization of files and directories. It is a much simpler alternative to RSYNC, with key differences:
+Zaloha is a shellscript for synchronization of files and directories. It is
+a much simpler alternative to RSYNC, with key differences:
 
- - Zaloha is a bash shellscript that uses only FIND, SORT and AWK. All you need is THIS file. For documentation, also read THIS file.
- - Both <sourceDir> and <backupDir> must be available locally (local HDD/SSD, flash drive, mounted Samba or NFS volume).
- - Zaloha does not lock files while copying them. No writing on either directory may occur while Zaloha runs.
- - Zaloha always copies whole files (not parts of files like RSYNC). This is, however, fully sufficient in many situations.
- - Zaloha has optional reverse-synchronization features (details below).
- - Zaloha prepares scripts for case of eventual restore (details below).
+ * Zaloha is a bash shellscript that uses only FIND, SORT and AWK. All you need
+   is THIS file. For documentation, also read THIS file.
+ * Both <sourceDir> and <backupDir> must be available locally (local HDD/SSD,
+   flash drive, mounted Samba or NFS volume).
+ * Zaloha does not lock files while copying them. No writing on either directory
+   may occur while Zaloha runs.
+ * Zaloha always copies whole files (not parts of files like RSYNC). This is,
+   however, fully sufficient in many situations.
+ * Zaloha has optional reverse-synchronization features (details below).
+ * Zaloha prepares scripts for case of eventual restore (details below).
 
-To detect which files need synchronization, Zaloha compares file sizes and modification times.
-It is clear that such detection is not 100% waterproof. A waterproof solution would require comparing file contents, e.g. via an MD5 checksum.
-However, as such comparing would increase the runtime by orders of magnitude, it is not implemented.
+To detect which files need synchronization, Zaloha compares file sizes and
+modification times. It is clear that such detection is not 100% waterproof.
+A waterproof solution would require comparing file contents, e.g. via an
+MD5 checksum. However, as such comparing would increase the runtime by orders
+of magnitude, it is not implemented.
 
-Zaloha asks to confirm actions before they are executed, i.e. prepared actions can be skipped, exceptional cases manually resolved, and Zaloha re-run.
-For automatic operations, use the "--noExec" option to tell Zaloha to not ask and to not execute the actions (but still prepare the scripts).
+Zaloha asks to confirm actions before they are executed, i.e. prepared actions
+can be skipped, exceptional cases manually resolved, and Zaloha re-run.
+For automatic operations, use the "--noExec" option to tell Zaloha to not ask
+and to not execute the actions (but still prepare the scripts).
 
-<sourceDir> and <backupDir> can be on different filesystem types if the filesystem limitations are not hit.
-Such limitations are (e.g. in case of ext4 -> FAT32): not allowed characters in filenames, filename uppercase conversions, file size limits, etc.
+<sourceDir> and <backupDir> can be on different filesystem types if the
+filesystem limitations are not hit. Such limitations are (e.g. in case of
+ext4 -> FAT32): not allowed characters in filenames, filename uppercase
+conversions, file size limits, etc.
 
-No writing on either directory may occur while Zaloha runs (no file locking is implemented).
-In demanding IT operations where backup must run concurrently with writing, a higher class of backup solution should be deployed,
-like storage snapshots (i.e. functionality that must be provided by the underlying OS/hardware).
+No writing on either directory may occur while Zaloha runs (no file locking is
+implemented). In demanding IT operations where backup must run concurrently with
+writing, a higher class of backup solution should be deployed, like storage
+snapshots (i.e. functionality that must be supported by the underlying
+OS/hardware).
 
-Handling of "weird" characters in filenames was a special focus during development of Zaloha (details below).
+Handling of "weird" characters in filenames was a special focus during
+development of Zaloha (details below).
 
 On Linux/Unics, Zaloha runs natively. On Windows, Cygwin is needed.
 
@@ -62,129 +77,193 @@ Repository: https://github.com/Fitus/Zaloha.sh
 
 MORE DETAILED DESCRIPTION
 
-The operation of Zaloha can be partitioned into three steps, in that following actions are performed:
+The operation of Zaloha can be partitioned into three steps, in that following
+actions are performed:
 
-Exec1:    remove obsolete files/directories from <backupDir>, or objects of conflicting types which occupy needed namespace
-------
+Exec1:  remove obsolete files/directories from <backupDir>, or objects of
+        conflicting types which occupy needed namespace
+-----------------------------------
 RMDIR     regular remove directory from <backupDir>
 REMOVE    regular remove file from <backupDir>
-REMOVE.!  remove file from <backupDir> which is newer than the last run of Zaloha
-REMOVE.x  remove other object on <backupDir> that occupies needed namespace, x = object type (l/p/s/c/b/D)
+REMOVE.!  remove file from <backupDir> which is newer than the
+          last run of Zaloha
+REMOVE.x  remove other object on <backupDir> that occupies needed namespace,
+          x = object type (l/p/s/c/b/D)
 
-Exec2:    copy files/directories to <backupDir> which exist only on <sourceDir>, or files which are newer on <sourceDir>
-------
+Exec2:  copy files/directories to <backupDir> which exist only on <sourceDir>,
+        or files which are newer on <sourceDir>
+-----------------------------------
 MKDIR     regular create new directory on <backupDir>
 NEW       regular create new file on <backupDir>
 UPDATE    regular update file on <backupDir>
 UPDATE.!  update file on <backupDir> which is newer than the last run of Zaloha
-UPDATE.?  update file on <backupDir> by a file on <sourceDir> which is not newer (by more than 1 sec (or 3601 secs if "--ok3600s"))
-unl.UP    unlink file on <backupDir> + UPDATE (can be switched off via "--noUnlink" option, see below)
-unl.UP.!  unlink file on <backupDir> + UPDATE.! (can be switched off via "--noUnlink" option, see below)
-unl.UP.?  unlink file on <backupDir> + UPDATE.? (can be switched off via "--noUnlink" option, see below)
-ATTR:ugm  update only attributes on <backupDir> (u=user ownership, g=group ownership, m=mode) (optional feature, see below)
+UPDATE.?  update file on <backupDir> by a file on <sourceDir> which is not newer
+          (by more than 1 sec (or 3601 secs if "--ok3600s"))
+unl.UP    unlink file on <backupDir> + UPDATE (can be switched off via the
+          "--noUnlink" option, see below)
+unl.UP.!  unlink file on <backupDir> + UPDATE.! (can be switched off via the
+          "--noUnlink" option, see below)
+unl.UP.?  unlink file on <backupDir> + UPDATE.? (can be switched off via the
+          "--noUnlink" option, see below)
+ATTR:ugm  update only attributes on <backupDir> (u=user ownership,
+          g=group ownership, m=mode) (optional feature, see below)
 
-Exec3:    reverse-synchronization from <backupDir> to <sourceDir> (optional feature, can be activated via the "--revNew" and "--revUp" options)
-------
+Exec3:  reverse-synchronization from <backupDir> to <sourceDir> (optional
+        feature, can be activated via the "--revNew" and "--revUp" options)
+-----------------------------------
 REV.MKDI  reverse-create parent directory on <sourceDir> due to REV.NEW
-REV.NEW   reverse-create file on <sourceDir> (if a standalone file on <backupDir> is newer than the last run of Zaloha)
-REV.UP    reverse-update file on <sourceDir> (if the file on <backupDir> is newer than the file on <sourceDir>)
-REV.UP.!  reverse-update file on <sourceDir> which is newer than the last run of Zaloha
+REV.NEW   reverse-create file on <sourceDir> (if a standalone file on
+          <backupDir> is newer than the last run of Zaloha)
+REV.UP    reverse-update file on <sourceDir> (if the file on <backupDir>
+          is newer than the file on <sourceDir>)
+REV.UP.!  reverse-update file on <sourceDir> which is newer
+          than the last run of Zaloha
 
 (internal use, for completion only)
 -----------------------------------
-OK        object without needed action on <sourceDir> (but still to be included in restore scripts)
-KEEP      keep other object on <backupDir> (= do not remove its parent directories)
+OK        object without needed action on <sourceDir> (but still to be
+          included in restore scripts)
+KEEP      keep other object on <backupDir> (= do not remove its
+          parent directories)
 
 Exec1:
 ------
-This must be the first step, because objects of conflicting types on <backupDir> would prevent synchronization (e.g. a file cannot overwrite a directory).
-Zaloha removes all obsolete files and directories on <backupDir>. Other objects than files and directories are removed only if they occupy namespace
-needed to write files and directories to <backupDir>.
+This must be the first step, because objects of conflicting types on <backupDir>
+would prevent synchronization (e.g. a file cannot overwrite a directory).
+Zaloha removes all obsolete files and directories on <backupDir>. Other objects
+than files and directories are removed only if they occupy namespace needed to
+write files and directories to <backupDir>.
 
-Not every "standalone" file on <backupDir> is "obsolete" if REV.NEW is active: see REV.NEW under Exec3.
+Not every "standalone" file on <backupDir> is "obsolete" if "--revNew" option
+is given: see REV.NEW under Exec3.
 
 Exec2:
 ------
-Files and directories which exist only on <sourceDir> are copied to <backupDir> (action codes NEW and MKDIR).
+Files and directories which exist only on <sourceDir> are copied to <backupDir>
+(action codes NEW and MKDIR).
 
-If the same file exists on both <sourceDir> and <backupDir>, and the file on <sourceDir> is newer, Zaloha "updates" the file on <backupDir> (action code UPDATE).
-If the file on <backupDir> is multiply linked (hardlinked), Zaloha removes (unlinks) it first, to prevent updating a multiply linked file,
-which could lead to follow-up effects (action code unl.UP). This unlinking can be switched off via the "--noUnlink" option.
+If the same file exists on both <sourceDir> and <backupDir>, and the file on
+<sourceDir> is newer, Zaloha "updates" the file on <backupDir> (action code
+UPDATE). If the file on <backupDir> is multiply linked (hardlinked), Zaloha
+removes (unlinks) it first, to prevent updating a multiply linked file,
+which could lead to follow-up effects (action code unl.UP). This unlinking
+can be switched off via the "--noUnlink" option.
 
-If the files differ only in attributes (u=user ownership, g=group ownership, m=mode), and attribute synchronization is switched on
-via the "--pUser", "--pGroup" and "--pMode" options, then only these attributes will be synchronized (action code ATTR).
-However, this is an optional feature, because: (1) the filesystem of <backupDir> might not be capable of storing these attributes,
-or (2) it may be wanted that all files and directories on <backupDir> are owned by the user who runs Zaloha.
+If the files differ only in attributes (u=user ownership, g=group ownership,
+m=mode), and attribute synchronization is switched on via the "--pUser",
+"--pGroup" and "--pMode" options, then only these attributes will be
+synchronized (action code ATTR). However, this is an optional feature, because:
+(1) the filesystem of <backupDir> might not be capable of storing these
+attributes, or (2) it may be wanted that all files and directories on
+<backupDir> are owned by the user who runs Zaloha.
 
-Regardless of whether these attributes are synchronized or not, an eventual restore of <sourceDir> from <backupDir> including these attributes
-is possible thanks to the restore scripts which Zaloha prepares in its metadata directory (see below).
+Regardless of whether these attributes are synchronized or not, an eventual
+restore of <sourceDir> from <backupDir> including these attributes is possible
+thanks to the restore scripts which Zaloha prepares in its metadata directory
+(see below).
 
-Symbolic links on <sourceDir> are neither followed nor synchronized to <backupDir>, but Zaloha prepares a restore script in its metadata directory.
+Symbolic links on <sourceDir> are neither followed nor synchronized to
+<backupDir>, but Zaloha prepares a restore script in its metadata directory.
 
-Zaloha contains an optional feature to detect multiply linked (hardlinked) files on <sourceDir>.
-If this feature is switched on (via the "--hLinks" option), Zaloha internally flags the second, third, etc. links to same file as "hardlinks",
-and synchronizes to <backupDir> only the first link (the "file"). The "hardlinks" are not synchronized to <backupDir>, but Zaloha prepares a restore script
-in its metadata directory. If this feature is switched off (no "--hLinks" option), then each link to a multiply linked file is treated as a separate regular file.
-Two risks exist: Zaloha might not detect that a file is in fact a hardlink, or Zaloha might falsely detect a hardlink while the file is in fact a unique file.
-The second risk is more severe, because the contents of the unique file will not be synchronized to <backupDir> in such case. For that reason, Zaloha contains
-additional checks against falsely detected hardlinks (see code of AWKHLINKS). Generally, use this feature only after proper testing on your filesystems.
-Please be cautious as inode-related issues exist on some filesystems and network-mounted filesystems.
+Zaloha contains an optional feature to detect multiply linked (hardlinked) files
+on <sourceDir>. If this feature is switched on (via the "--hLinks" option),
+Zaloha internally flags the second, third, etc. links to same file as
+"hardlinks", and synchronizes to <backupDir> only the first link (the "file").
+The "hardlinks" are not synchronized to <backupDir>, but Zaloha prepares a
+restore script in its metadata directory. If this feature is switched off
+(no "--hLinks" option), then each link to a multiply linked file is treated as
+a separate regular file.
 
-Zaloha does not synchronize other types of objects on <sourceDir> (named pipes, sockets, special devices, etc).
-These objects are considered to be part of the operating system or parts of applications, and dedicated scripts for their (re-)creation should exist.
+The detection of hardlinks brings two risks: Zaloha might not detect that a file
+is in fact a hardlink, or Zaloha might falsely detect a hardlink while the file
+is in fact a unique file. The second risk is more severe, because the contents
+of the unique file will not be synchronized to <backupDir> in such case.
+For that reason, Zaloha contains additional checks against falsely detected
+hardlinks (see code of AWKHLINKS). Generally, use this feature only after proper
+testing on your filesystems. Be cautious as inode-related issues exist on some
+filesystems and network-mounted filesystems.
+
+Zaloha does not synchronize other types of objects on <sourceDir> (named pipes,
+sockets, special devices, etc). These objects are considered to be part of the
+operating system or parts of applications, and dedicated scripts for their
+(re-)creation should exist.
 
 Exec3:
 ------
-This step is optional and can be activated via the "--revNew" and "--revUp" options.
+This step is optional and can be activated via the "--revNew" and "--revUp"
+options.
 
-Why is this feature useful? Imagine you use a Windows notebook while working in the field.
-At home, you have got a Linux server to that you regularly synchronize your data. However, sometimes you work directly on the Linux server.
-That work should be "reverse-synchronized" from the Linux server (<backupDir>) back to the Windows notebook (<sourceDir>).
-(Of course, assumed that the two works do not conflict).
+Why is this feature useful? Imagine you use a Windows notebook while working in
+the field.  At home, you have got a Linux server to that you regularly
+synchronize your data. However, sometimes you work directly on the Linux server.
+That work should be "reverse-synchronized" from the Linux server (<backupDir>)
+back to the Windows notebook (<sourceDir>) (of course, assumed that there is no
+conflict between the work on the notebook and the work on the server).
 
-REV.NEW: If a standalone file on <backupDir> is newer than the last run of Zaloha, and REV.NEW is active ("--revNew" option),
-then that file will be reverse-copied to <sourceDir> (REV.NEW) including all necessary parent directories (REV.MKDI).
+REV.NEW: If a standalone file on <backupDir> is newer than the last run of
+Zaloha, and the "--revNew" option is given, then that file will be
+reverse-copied to <sourceDir> (REV.NEW) including all necessary parent
+directories (REV.MKDI).
 
-REV.UP: If the same file exists on both <sourceDir> and <backupDir>, and the file on <backupDir> is newer, and REV.UP is active
-("--revUp" option), then that file will be used to reverse-update the older file on <sourceDir> (action code REV.UP).
+REV.UP: If the same file exists on both <sourceDir> and <backupDir>, and the
+file on <backupDir> is newer, and the "--revUp" option is given, then that file
+will be used to reverse-update the older file on <sourceDir>
+(action code REV.UP).
 
-Optionally, to preserve attributes during the REV.MKDI, REV.NEW and REV.UP operations: use options "--pRevUser", "--pRevGroup" and "--pRevMode".
+Optionally, to preserve attributes during the REV.MKDI, REV.NEW and REV.UP
+operations: use options "--pRevUser", "--pRevGroup" and "--pRevMode".
 
-If REV.NEW is not active (no "--revNew" option), then each standalone file on <backupDir> is considered obsolete (and removed).
-If REV.UP is not active (no "--revUp" option), then files on <sourceDir> always update files on <backupDir> if they differ.
+If reverse synchronization is not active: If no "--revNew" option is given,
+then each standalone file on <backupDir> is considered obsolete (and removed).
+If no "--revUp" option is given, then files on <sourceDir> always update files
+on <backupDir> if they differ.
 
-Reverse-synchronization to <sourceDir> increases the overall complexity of the solution. Use it only in the interactive regime of Zaloha,
-where human oversight and confirmation of prepared actions are in place. Do not use it in automatic operations.
+Reverse-synchronization to <sourceDir> increases the overall complexity of the
+solution. Use it only in the interactive regime of Zaloha, where human oversight
+and confirmation of prepared actions are in place.
+Do not use it in automatic operations.
 
 Metadata directory of Zaloha
 ----------------------------
-Zaloha creates a metadata directory: <backupDir>/.Zaloha_metadata. The location of the metadata directory can be changed via the "--metaDir" option.
-The purposes of individual files in that directory are described in a separate section below. Briefly, the metadata directory is used for:
+Zaloha creates a metadata directory: <backupDir>/.Zaloha_metadata. The location
+of the metadata directory can be changed via the "--metaDir" option.
 
- - AWK program files (produced from "here documents" in Zaloha)
- - Shellscripts to run FIND commands
- - CSV metadata files
- - Exec1/2/3 shellscripts
- - Shellscripts for the case of restore
- - Touchfile marking execution of actions
+The purposes of individual files are described as comments in program code.
+Briefly, they are:
+
+ * AWK program files (produced from "here documents" in Zaloha)
+ * Shellscripts to run FIND commands
+ * CSV metadata files
+ * Exec1/2/3 shellscripts
+ * Shellscripts for the case of restore
+ * Touchfile marking execution of actions
 
 Files persist in the metadata directory until the next invocation of Zaloha.
 
-To obtain information about what Zaloha did (counts of removed/copied files, total counts, etc), do not parse the screen output, but query the CSV metadata files.
-Query the CSV metadata files after AWKCLEANER. Do not query the raw CSV outputs of FIND commands (before AWKCLEANER) and the produced shellscripts,
-because due to eventual newlines in filenames, they may contain multiple lines per "record".
+To obtain information about what Zaloha did (counts of removed/copied files,
+total counts, etc), do not parse the screen output, but query the CSV metadata
+files. Query the CSV metadata files after AWKCLEANER. Do not query the raw
+CSV outputs of FIND commands (before AWKCLEANER) and the produced shellscripts,
+because due to eventual newlines in filenames, they may contain multiple lines
+per "record".
 
 Shellscripts for case of restore
 --------------------------------
-Zaloha prepares shellscripts for the case of restore in its metadata directory (scripts 800 through 860).
-Each type of operation is contained in a separate shellscript, to give maximum freedom (= for each script, decide whether to apply or to not apply).
-Further, each shellscript has a header part where key variables for whole script are defined (and can be adjusted as needed).
+Zaloha prepares shellscripts for the case of restore in its metadata directory
+(scripts 800 through 860). Each type of operation is contained in a separate
+shellscript, to give maximum freedom (= for each script, decide whether to apply
+or to not apply). Further, each shellscript has a header part where
+key variables for whole script are defined (and can be adjusted as needed).
 
-The script to copy files (script 810) needs (as the only one) access to both directories, and is expected to be the most time consuming.
-In some situations, copying files in parallel might speed things up (especially when many small files should be copied over a network).
-For that case, the 810 script contains support for parallel operation of up to 8 parallel processes. To utilize this, create 8 copies of the 810 script.
-In the header of the first copy, keep only CP1 and TOUCH1 assigned to real commands, and assign the remaining ones to empty command (:).
-Adjust the other copies accordingly. Then run the copies in parallel.
+The script to copy files (script 810) needs (as the only one) access to both
+directories, and is expected to be the most time consuming. In some situations,
+copying files in parallel might speed things up (especially when many small
+files should be copied over a network). For that case, the 810 script contains
+support for parallel operation of up to 8 parallel processes. To utilize this,
+create 8 copies of the 810 script. In the header of the first copy, keep only
+CP1 and TOUCH1 assigned to real commands, and assign the remaining ones to
+empty command (:). Adjust the other copies accordingly.
+Then run the copies in parallel.
 
 ###########################################################
 
@@ -192,77 +271,130 @@ INVOCATION
 
 Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 
---sourceDir=<sourceDir> is mandatory. <sourceDir> must exist, otherwise Zaloha throws an error (except the "--noDirChecks" option is given).
+--sourceDir=<sourceDir> is mandatory. <sourceDir> must exist, otherwise Zaloha
+    throws an error (except the "--noDirChecks" option is given).
 
---backupDir=<backupDir> is mandatory. <backupDir> must exist, otherwise Zaloha throws an error (except the "--noDirChecks" option is given).
+--backupDir=<backupDir> is mandatory. <backupDir> must exist, otherwise Zaloha
+    throws an error (except the "--noDirChecks" option is given).
 
-Other options are always introduced by a double dash (--), and either have a value, or are options without a value:
+--findSourceOps=<findSourceOps> are additional operands for FIND command that
+    searches <sourceDir>. It allows to implement any filtering achievable by
+    FIND operands. Please see the FIND manual page for more info. The operands
+    must form an OR-connected chain: operandA -o operandB -o operandC -o ...
+    This is required because Zaloha internally combines <findSourceOps> with
+    <findGeneralOps> and with own operands, and all of them follow this
+    convention. If an earlier operand in the OR-connected chain evaluates TRUE,
+    FIND does not evaluate following operands, leading to no output being
+    produced. The main use of <findSourceOps> is to exclude individual files
+    and directories from synchronization:
 
---findSourceOps=<findSourceOps> are additional operands for FIND command that searches <sourceDir>. It allows to implement any filtering achievable by FIND operands.
-    Please see the FIND manual page for more info. The operands must form an OR-connected chain: operandA -o operandB -o operandC -o operandD -o
-    This is required because Zaloha internally combines <findSourceOps> with <findGeneralOps> and with own operands, and all of them follow this convention.
-    If an earlier operand in the OR-connected chain evaluates TRUE, FIND does not evaluate following operands, leading to no output being produced.
-    The main use of <findSourceOps> is to exclude individual files and directories from synchronization:
-
-    a) to exclude whole subdirectories on <sourceDir> (= do not descend into them):
+    a) exclude whole subdirectories on <sourceDir> (= don't descend into them):
       -path <subdir path pattern> -prune -o
       -name <subdir name pattern> -prune -o
 
-    b) to exclude individual files on <sourceDir>:
+    b) exclude individual files on <sourceDir>:
       -path <file path pattern> -o
       -name <file name pattern> -o
 
-    <findSourceOps> applies only to <sourceDir>. If a file on <sourceDir> is excluded by <findSourceOps> and the same file exists on <backupDir>,
-    then Zaloha evaluates the file on <backupDir> as obsolete (= removes it). Compare this with <findGeneralOps> (see below).
+    <findSourceOps> applies only to <sourceDir>. If a file on <sourceDir> is
+    excluded by <findSourceOps> and the same file exists on <backupDir>,
+    then Zaloha evaluates the file on <backupDir> as obsolete (= removes it).
+    Compare this with <findGeneralOps> (see below).
 
-    Although <findSourceOps> consists of multiple words, it is passed in as a single string (= enclose it in double-quotes or single-quotes in your shell).
-    Zaloha contains a special parser (AWKPARSER) that splits it into separate words (arguments for the FIND command).
-    If a pattern (word) in <findSourceOps> contains spaces, enclose it in double-quotes. Note: to protect the double-quotes from your shell, use \".
-    If a pattern (word) in <findSourceOps> itself contains a double quote, use \". Note: to protect the backslash and the double-quote from your shell, use \\\".
+    Although <findSourceOps> consists of multiple words, it is passed in as
+    a single string (= enclose it in double-quotes or single-quotes in your
+    shell). Zaloha contains a special parser (AWKPARSER) that splits it into
+    separate words (arguments for the FIND command). If a pattern (word) in
+    <findSourceOps> contains spaces, enclose it in double-quotes. Note: to
+    protect the double-quotes from your shell, use \". If a pattern (word) in
+    <findSourceOps> itself contains a double quote, use \". Note: to protect
+    the backslash and the double-quote from your shell, use \\\".
 
-    Please note that in the patterns of the -path and -name operands, FIND itself interprets following characters specially (see FIND documentation): *, ?, [, ], \.
-    If these characters are to be taken literally, they must be backslash-escaped. Again, take care of protecting backslashes from your shell.
+    Please note that in the patterns of the -path and -name operands, FIND
+    itself interprets following characters specially (see FIND documentation):
+    *, ?, [, ], \. If these characters are to be taken literally, they must be
+    backslash-escaped. Again, take care of protecting backslashes from your
+    shell.
 
-    <findSourceOps> may contain the placeholder ///d/ for <sourceDir> (more precisely, <sourceDir> followed by the directory separator and properly escaped,
-    double-quoted and eventually prepended by "./" for use in FIND patterns).
+    <findSourceOps> may contain the placeholder ///d/ for <sourceDir> (more
+    precisely, <sourceDir> followed by the directory separator and properly
+    escaped, double-quoted and eventually prepended by "./" for use in
+    FIND patterns).
 
-    Example: exclude directory <sourceDir>/.git, all directories Windows Security and all files My "Secret" Things (double-quoted and single-quoted versions):
+    Examples: * exclude directory <sourceDir>/.git,
+              * exclude all directories Windows Security
+              * exclude and all files My "Secret" Things
+    (double-quoted and single-quoted versions):
 
-    --findSourceOps="-path ///d/.git -prune -o -name \"Windows Security\" -prune -o -name \"My \\\"Secret\\\" Things\" -o"
-    --findSourceOps='-path ///d/.git -prune -o -name "Windows Security" -prune -o -name "My \"Secret\" Things" -o'
+    --findSourceOps="-path ///d/.git -prune -o"
+    --findSourceOps="-name \"Windows Security\" -prune -o"
+    --findSourceOps="-name \"My \\\"Secret\\\" Things\" -o"
 
---findGeneralOps=<findGeneralOps> underlies the same rules as <findSourceOps>. The key difference is that <findGeneralOps> acts on both <sourceDir> and <backupDir>.
-    Hence, generally speaking, it can be used to constrain synchronization to only subsets of files and directories, based on filtering by FIND operands.
-    The main use of <findGeneralOps> is to exclude "Trash" directories from synchronization. <findGeneralOps> has an internally defined default, used to exclude:
+    --findSourceOps='-path ///d/.git -prune -o'
+    --findSourceOps='-name "Windows Security" -prune -o'
+    --findSourceOps='-name "My \"Secret\" Things" -o'
 
-    <sourceDir or backupDir>/$RECYCLE.BIN               ... Windows Recycle Bin (assumed to exist directly under <sourceDir> or <backupDir>)
-    <sourceDir or backupDir>/.Trash_<number>*           ... Linux Trash (assumed to exist directly under <sourceDir> or <backupDir>)
-    <sourceDir or backupDir>/lost+found                 ... Linux lost + found filesystem fragments (assumed to exist directly under <sourceDir> or <backupDir>)
+--findGeneralOps=<findGeneralOps> underlies the same rules as <findSourceOps>.
+    The key difference is that <findGeneralOps> acts on both <sourceDir> and
+    <backupDir>. Hence, generally speaking, it can be used to constrain
+    synchronization to only subsets of files and directories, based on filtering
+    by FIND operands. The main use of <findGeneralOps> is to exclude "Trash"
+    directories from synchronization. <findGeneralOps> has an internally defined
+    default, used to exclude:
 
-    The placeholder ///d/ is for <sourceDir> or <backupDir>, depending on the actual search.
-    To extend (= combine, not replace) the internally defined <findGeneralOps> with own extension, pass in own extension prepended by the plus sign ("+").
+    <sourceDir or backupDir>/$RECYCLE.BIN
+      ... Windows Recycle Bin (assumed to exist directly under <sourceDir> or
+          <backupDir>)
 
---noExec        ... needed if Zaloha is invoked automatically: do not ask, do not execute the actions, but still prepare the scripts.
-    The prepared scripts then do not contain shell tracing and they do not contain the "set -e" instruction. This means that the scripts ignore individual failed commands
-    and try to do as much work as possible, which is a behavior different from the interactive regime, where scripts are traced and halt on the first error.
+    <sourceDir or backupDir>/.Trash_<number>*
+      ... Linux Trash (assumed to exist directly under <sourceDir> or
+          <backupDir>)
 
---revNew        ... activate REV.NEW (= if standalone file on <backupDir> is newer than the last run of Zaloha, reverse-copy it to <sourceDir>)
+    <sourceDir or backupDir>/lost+found
+      ... Linux lost + found filesystem fragments (assumed to exist directly
+          under <sourceDir> or <backupDir>)
 
---revUp         ... activate REV.UP (= if file on <backupDir> is newer than file on <sourceDir>, reverse-update the file on <sourceDir>)
+    The placeholder ///d/ is for <sourceDir> or <backupDir>, depending on the
+    actual search. To extend (= combine, not replace) the internally defined
+    <findGeneralOps> with own extension, pass in own extension prepended by the
+    plus sign ("+").
 
---hLinks        ... perform hardlink detection (inode-deduplication) on <sourceDir>
+--noExec        ... needed if Zaloha is invoked automatically: do not ask,
+    do not execute the actions, but still prepare the scripts. The prepared
+    scripts then do not contain shell tracing and they do not contain the
+    "set -e" instruction. This means that the scripts ignore individual failed
+    commands and try to do as much work as possible, which is a behavior
+    different from the interactive regime, where scripts are traced and halt
+    on the first error.
 
---ok3600s       ... additional tolerance for modification time differences of exactly +/- 3600 seconds (explained in Special Cases section below)
+--revNew        ... enable REV.NEW (= if standalone file on <backupDir> is
+                    newer than the last run of Zaloha, reverse-copy it
+                    to <sourceDir>)
 
---noUnlink      ... never unlink multiply linked files on <backupDir> before writing to them
+--revUp         ... enable REV.UP (= if file on <backupDir> is newer than
+                    file on <sourceDir>, reverse-update the file on <sourceDir>)
 
---touch         ... use cp + touch instead of cp --preserve=timestamps (explained in Special Cases section below)
+--hLinks        ... perform hardlink detection (inode-deduplication)
+                    on <sourceDir>
 
---pUser         ... synchronize user ownerships on <backupDir> based on <sourceDir>
+--ok3600s       ... additional tolerance for modification time differences of
+                    exactly +/- 3600 seconds (explained in Special Cases section
+                    below)
 
---pGroup        ... synchronize group ownerships on <backupDir> based on <sourceDir>
+--noUnlink      ... never unlink multiply linked files on <backupDir> before
+                    writing to them
 
---pMode         ... synchronize modes (permission bits) on <backupDir> based on <sourceDir>
+--touch         ... use cp + touch instead of cp --preserve=timestamps
+                    (explained in Special Cases section below)
+
+--pUser         ... synchronize user ownerships on <backupDir>
+                    based on <sourceDir>
+
+--pGroup        ... synchronize group ownerships on <backupDir>
+                    based on <sourceDir>
+
+--pMode         ... synchronize modes (permission bits) on <backupDir>
+                    based on <sourceDir>
 
 --pRevUser      ... preserve user ownerships during REV operations
 
@@ -270,94 +402,145 @@ Other options are always introduced by a double dash (--), and either have a val
 
 --pRevMode      ... preserve modes (permission bits) during REV operations
 
---noRestore     ... do not prepare scripts for the case of restore (= saves processing time and disk space, see optimization remarks below)
-    The scripts for the case of restore can still be produced ex-post by manually running the respective AWK program (700 file) on the source CSV file (505 file).
+--noRestore     ... do not prepare scripts for the case of restore (= saves
+    processing time and disk space, see optimization remarks below). The scripts
+    for the case of restore can still be produced ex-post by manually running
+    the respective AWK program (700 file) on the source CSV file (505 file).
 
---optimCSV      ... optimize space occupied by CSV metadata files by removing intermediary CSV files after use (see optimization remarks below)
-    If intermediary CSV metadata files are removed, an ex-post analysis of eventual problems may be impossible.
+--optimCSV      ... optimize space occupied by CSV metadata files by removing
+    intermediary CSV files after use (see optimization remarks below).
+    If intermediary CSV metadata files are removed, an ex-post analysis of
+    eventual problems may be impossible.
 
---metaDir=<metaDir> allows to place the Zaloha metadata directory to a different location than the default (which is <backupDir>/.Zaloha_metadata).
+--metaDir=<metaDir> allows to place the Zaloha metadata directory to a different
+    location than the default (which is <backupDir>/.Zaloha_metadata).
     The reasons might be:
-      a) non-writable <backupDir> (if Zaloha is used to perform comparison only (i.e. with "--noExec" option))
+      a) non-writable <backupDir> (if Zaloha is used to perform comparison only
+        (i.e. with "--noExec" option))
       b) a requirement to have Zaloha metadata on a separate storage
-    It is possible (but not recommended) to place <metaDir> to a different location inside of <backupDir>, or inside of <sourceDir>.
-    In such cases, FIND operands to exclude the metadata directory from the FIND searches must be explicitly passed in via <findGeneralOps>.
-    If Zaloha is used to synchronize multiple directories, then each such instance of Zaloha must have its own separate metadata directory.
+    It is possible (but not recommended) to place <metaDir> to a different
+    location inside of <backupDir>, or inside of <sourceDir>. In such cases,
+    FIND operands to exclude the metadata directory from the FIND searches must
+    be explicitly passed in via <findGeneralOps>.
+    If Zaloha is used to synchronize multiple directories, then each such
+    instance of Zaloha must have its own separate metadata directory.
 
---noFindSource  ... do not run FIND (script 210) to search <sourceDir>, and use externally supplied CSV metadata file 310 instead
---noFindBackup  ... do not run FIND (script 220) to search <backupDir>, and use externally supplied CSV metadata file 320 instead
-   Use these options if you have better (especially performance-wise) methods for obtaining the CSV metadata files 310 and/or 320.
-   For instance, if <sourceDir> and/or <backupDir> are network-mounted directories, running FIND commands on them might be slow.
-   Running FIND directly on the file server (e.g. via SSH) and downloading the resulting CSV metadata file should be much quicker.
-   The externally supplied CSV metadata files 310 and/or 320 must be placed into the Zaloha metadata directory before invoking Zaloha,
-   and these files must, of course, have the same format as the CSV metadata files that would otherwise be produced by the scripts 210 and 220.
+--noFindSource  ... do not run FIND (script 210) to search <sourceDir>
+                    and use externally supplied CSV metadata file 310 instead
+--noFindBackup  ... do not run FIND (script 220) to search <backupDir>
+                    and use externally supplied CSV metadata file 320 instead
+   Use these options if you have better (especially performance-wise) methods
+   for obtaining the CSV metadata files 310 and/or 320. For instance, if
+   <sourceDir> and/or <backupDir> are network-mounted directories, running FIND
+   commands on them might be slow. Running FIND directly on the file server
+   (e.g. via SSH) and downloading the resulting CSV metadata file should be
+   much quicker. The externally supplied CSV metadata files 310 and/or 320 must
+   be placed into the Zaloha metadata directory before invoking Zaloha, and
+   these files must, of course, have the same format as the CSV metadata files
+   that would otherwise be produced by the scripts 210 and 220.
 
---noDirChecks   ... switch off the checks for existence of <sourceDir> and <backupDir>
-    This is useful in connection with the options "--metaDir", "--noFindSource" and/or "--noFindBackup" and "--noExec", because under such setup
-    Zaloha does not require <sourceDir> and/or <backupDir> to be accessible. In the extreme case, when all these options are given,
-    Zaloha operates solely on its metadata directory.
+--noDirChecks   ... switch off the checks for existence of <sourceDir> and
+    <backupDir>. This is useful in connection with the options "--metaDir",
+    "--noFindSource" and/or "--noFindBackup" and "--noExec", because they
+    make it possible to run Zaloha without <sourceDir> and/or <backupDir> being
+    accessible. In the extreme case, when all these options are used, Zaloha
+    operates solely on its metadata directory.
 
 --noExec1Hdr    ... do not write header to the shellscript for Exec1 (file 610)
 --noExec2Hdr    ... do not write header to the shellscript for Exec2 (file 620)
 --noExec3Hdr    ... do not write header to the shellscript for Exec3 (file 630)
    These options can be used only together with the "--noExec" option.
-   The headers of the shellscripts for Exec1, Exec2 and Exec3 (files 610, 620 and 630) contain definitions used in their bodies.
-   Scripts without headers (i.e. bodies only) can be easily prepended by alternative headers that contain different definitions.
+   The headers of the shellscripts for Exec1, Exec2 and Exec3 (files 610, 620
+   and 630) contain definitions used in their bodies. Scripts without headers
+   (i.e. bodies only) can be easily prepended by alternative headers that
+   contain different definitions.
 
 --noProgress    ... suppress progress messages (less screen output)
-    If both options "--noExec" and "--noProgress" are used, Zaloha does not produce any output on stdout (traditional behavior of Unics tools).
+    If both options "--noExec" and "--noProgress" are used, Zaloha does not
+    produce any output on stdout (traditional behavior of Unics tools).
 
---color         ... use color highlighting (can be used on terminals which support ANSI escape codes)
+--color         ... use color highlighting (can be used on terminals which
+                    support ANSI escape codes)
 
---lTest         ... (do not use in real operations) support for lint-testing of AWK programs
+--lTest         ... (do not use in real operations) support for lint-testing
+                    of AWK programs
 
-Optimization remarks: If Zaloha operates on directories with huge numbers of files, especially small ones, then the size of metadata
-plus the size of scripts for the case of restore may exceed the size of the files themselves. If this leads to hitting of storage
-and/or processing time limits, use options "--noRestore" and "--optimCSV".
+--help          ... show Zaloha documentation (using the LESS program) and exit
 
-Zaloha must be run by a user with sufficient privileges to read <sourceDir> and to write and perform other required actions on <backupDir>.
-In case of the REV actions, privileges to write and perform other required actions on <sourceDir> are required as well.
-Zaloha does not contain any internal checks as to whether privileges are sufficient. Failures of commands run by Zaloha must be monitored instead.
+Optimization remarks: If Zaloha operates on directories with huge numbers of
+files, especially small ones, then the size of metadata plus the size of scripts
+for the case of restore may exceed the size of the files themselves. If this
+leads to hitting of storage and/or processing time limits, use options
+"--noRestore" and "--optimCSV".
 
-Zaloha does not contain protection against concurrent invocations with conflicting <backupDir> (and for REV also conflicting <sourceDir>): this is a responsibility
-of the invoker, especially due to the fact that Zaloha may conflict with other processes as well.
+Zaloha must be run by a user with sufficient privileges to read <sourceDir> and
+to write and perform other required actions on <backupDir>. In case of the REV
+actions, privileges to write and perform other required actions on <sourceDir>
+are required as well. Zaloha does not contain any internal checks as to whether
+privileges are sufficient. Failures of commands run by Zaloha must be monitored
+instead.
+
+Zaloha does not contain protection against concurrent invocations with
+conflicting <backupDir> (and for REV also conflicting <sourceDir>): this is
+responsibility of the invoker, especially due to the fact that Zaloha may
+conflict with other processes as well.
 
 In case of failure: resolve the problem and re-run Zaloha with same parameters.
-In the second run, Zaloha should not repeat the actions completed by the first run: it should continue from the action on which the first run failed.
-If the first run completed successfully, no actions should be performed in the second run (this is an important test case, see below).
+In the second run, Zaloha should not repeat the actions completed by the first
+run: it should continue from the action on which the first run failed. If the
+first run completed successfully, no actions should be performed in the second
+run (this is an important test case, see below).
 
-Typically, Zaloha is invoked from a wrapper script that does the necessary directory mounts, then runs Zaloha with the required parameters, then directory unmounts.
+Typically, Zaloha is invoked from a wrapper script that does the necessary
+directory mounts, then runs Zaloha with the required parameters, then directory
+unmounts.
 
 ###########################################################
 
 TESTING, DEPLOYMENT, INTEGRATION
 
-First, test Zaloha on a small and noncritical set of your data. Although Zaloha has been tested on several environments, it can happen that Zaloha malfunctions on
-your environment due to different behavior of the operating system, bash, FIND, SORT, AWK and other utilities. Perform tests in the interactive regime first.
-If Zaloha prepares wrong actions, abort it at the next prompt.
+First, test Zaloha on a small and noncritical set of your data. Although Zaloha
+has been tested on several environments, it can happen that Zaloha malfunctions
+on your environment due to different behavior of the operating system, bash,
+FIND, SORT, AWK and other utilities. Perform tests in the interactive regime
+first. If Zaloha prepares wrong actions, abort it at the next prompt.
 
-After first synchronization, an important test is to run second synchronization, which should execute no actions, as the directories should be already synchronized.
+After first synchronization, an important test is to run second synchronization,
+which should execute no actions, as the directories should be already
+synchronized.
 
-Test Zaloha under all scenarios which can occur on your environment. Test Zaloha with filenames containing "weird" or national characters.
+Test Zaloha under all scenarios which can occur on your environment. Test Zaloha
+with filenames containing "weird" or national characters.
 
-Verify that all your programs that write to <sourceDir> change modification times of the files written, so that Zaloha does not miss changed files.
+Verify that all your programs that write to <sourceDir> change modification
+times of the files written, so that Zaloha does not miss changed files.
 
-Simulate the loss of <sourceDir> and perform test of the recovery scenario using the recovery scripts prepared by Zaloha.
+Simulate the loss of <sourceDir> and perform test of the recovery scenario using
+the recovery scripts prepared by Zaloha.
 
 Automatic operations
 --------------------
 
-Additional care must be taken when using Zaloha in automatic operations ("--noExec" option):
+Additional care must be taken when using Zaloha in automatic operations
+("--noExec" option):
 
-Exit status and standard error of Zaloha and of the scripts prepared by Zaloha must be monitored by a monitoring system used within your IT landscape.
-Nonzero exit status and writes to standard error must be brought to attention and investigated. If Zaloha itself fails, the process must be aborted.
-The scripts prepared under the "--noExec" option do not halt on the first error, also their zero exit status does not imply that there were no failed individual commands.
+Exit status and standard error of Zaloha and of the scripts prepared by Zaloha
+must be monitored by a monitoring system used within your IT landscape.
+Nonzero exit status and writes to standard error must be brought to attention
+and investigated. If Zaloha itself fails, the process must be aborted.
+The scripts prepared under the "--noExec" option do not halt on the first error,
+also their zero exit status does not imply that there were no failed
+individual commands.
 
-Implement sanity checks to avoid data disasters like synchronizing <sourceDir> to <backupDir> in the moment when <sourceDir> is unmounted, which would lead
-to loss of backup data. Evaluate counts of actions prepared by Zaloha (count records in CSV metadata files in Zaloha metadata directory). Abort the process if the
-action counts exceed sanity thresholds defined by you, e.g. when Zaloha prepares an unexpectedly high number of removals.
+Implement sanity checks to avoid data disasters like synchronizing <sourceDir>
+to <backupDir> in the moment when <sourceDir> is unmounted, which would lead
+to loss of backup data. Evaluate counts of actions prepared by Zaloha (count
+records in CSV metadata files in Zaloha metadata directory). Abort the process
+if the action counts exceed sanity thresholds defined by you, e.g. when Zaloha
+prepares an unexpectedly high number of removals.
 
-The process which invokes Zaloha in automatic regime should function as follows (pseudocode):
+The process which invokes Zaloha in automatic regime should function as follows
+(pseudocode):
 
   run Zaloha.sh --noExec
   in case of fail: abort process
@@ -376,41 +559,67 @@ The process which invokes Zaloha in automatic regime should function as follows 
 
 SPECIAL AND CORNER CASES
 
-To detect which files need synchronization, Zaloha compares file sizes and modification times. If the file sizes differ, synchronization is needed.
-The modification time is more tricky: Zaloha tolerates +/- 1 second differences, due to FAT32 rounding to the nearest 2 seconds.
-In some situations, it is necessary to tolerate differences of exactly +/- 1 hour (+/- 3600 seconds) as well (to be activated via the "--ok3600s" option).
-Typically, this occurs when one of the directories is on a filesystem type that stores modification times not in universal time but in local time (e.g. FAT32),
-and the OS is not able, for some reason, to correctly reflect the switching of daylight saving time while converting the local time.
+To detect which files need synchronization, Zaloha compares file sizes and
+modification times. If the file sizes differ, synchronization is needed.
+The modification time is more tricky: Zaloha tolerates +/- 1 second differences,
+due to FAT32 rounding to the nearest 2 seconds. In some situations, it is
+necessary to tolerate differences of exactly +/- 1 hour (+/- 3600 seconds)
+as well (to be activated via the "--ok3600s" option). Typically, this occurs
+when one of the directories is on a filesystem type that stores modification
+times not in universal time but in local time (e.g. FAT32), and the OS is
+not able, for some reason, to correctly reflect the switching of
+daylight saving time while converting the local time.
 
-The +/- 1 hour differences, tolerable via the "--ok3600s" option, are assumed to exist between <sourceDir> and <backupDir>, but not between <backupDir> and <metaDir>.
-This is relevant especially if <metaDir> is located outside of <backupDir> (via the "--metaDir" option).
+The +/- 1 hour differences, tolerable via the "--ok3600s" option, are assumed
+to exist between <sourceDir> and <backupDir>, but not between <backupDir>
+and <metaDir>. This is relevant especially if <metaDir> is located outside of
+<backupDir> (via the "--metaDir" option).
 
-It is possible (but not recommended) for <backupDir> to be a subdirectory of <sourceDir> and vice versa.
-In such cases, conditions to avoid recursive copying must be passed in via <findGeneralOps>.
+It is possible (but not recommended) for <backupDir> to be a subdirectory of
+<sourceDir> and vice versa. In such cases, conditions to avoid recursive copying
+must be passed in via <findGeneralOps>.
 
-The SORT commands are run under the LC_ALL=C environment variable, to avoid problems caused by some locales that ignore slashes and other punctuations during sorting.
+The SORT commands are run under the LC_ALL=C environment variable, to avoid
+problems caused by some locales that ignore slashes and other punctuations
+during sorting.
 
-In some situations (e.g. Linux Samba + Linux Samba client), cp --preserve=timestamps does not preserve modification timestamps (unless on empty files).
-In that case, Zaloha should be instructed (via the "--touch" option) to use subsequent touch commands instead, which is a more robust solution.
-In the scripts for case of restore, touch commands are used unconditionally.
+In some situations (e.g. Linux Samba + Linux Samba client),
+cp --preserve=timestamps does not preserve modification timestamps (unless on
+empty files). In that case, Zaloha should be instructed (via the "--touch"
+option) to use subsequent touch commands instead, which is a more robust
+solution. In the scripts for case of restore, touch commands are used
+unconditionally.
 
-Corner case REV.NEW + namespace on <sourceDir> needed for REV.MKDI or REV.NEW action is occupied by object of conflicting type:
-The file on <backupDir> will not be reverse-copied to <sourceDir>, but removed. As this file is newer than the last run of Zaloha, the action will be REMOVE.!.
+Corner case REV.NEW + namespace on <sourceDir> needed for REV.MKDI or REV.NEW
+action is occupied by object of conflicting type: The file on <backupDir>
+will not be reverse-copied to <sourceDir>, but removed. As this file must be
+newer than the last run of Zaloha, the action will be REMOVE.!.
 
-Corner case REV.NEW + <findSourceOps>: If the same file exists on both <sourceDir> and <backupDir>, and on <sourceDir> that file is masked by <findSourceOps>
-and on <backupDir> that file is newer than the last run of Zaloha, REV.NEW on that file will be prepared. This is an error which Zaloha is unable to detect.
-Hence, the shellscript for Exec3 contains a test that throws an error in such situation.
+Corner case REV.NEW + <findSourceOps>: If the same file exists on both
+<sourceDir> and <backupDir>, and on <sourceDir> that file is masked by
+<findSourceOps> and on <backupDir> that file is newer than the last run of
+Zaloha, REV.NEW on that file will be prepared. This is an error which Zaloha
+is unable to detect. Hence, the shellscript for Exec3 contains a test that
+throws an error in such situation.
 
-Corner case REV.UP + "--ok3600s": The "--ok3600s" option makes it harder to determine which file is newer (decision UPDATE vs REV.UP).
-The implemented solution for that case is that for REV.UP, the <backupDir> file must be newer by more than 3601 seconds.
+Corner case REV.UP + "--ok3600s": The "--ok3600s" option makes it harder
+to determine which file is newer (decision UPDATE vs REV.UP). The implemented
+solution for that case is that for REV.UP, the <backupDir> file must be newer
+by more than 3601 seconds.
 
-Corner case REV.UP + hardlinked file: Reverse-updating a multiply linked (hardlinked) file on <sourceDir> may lead to follow-up effects.
+Corner case REV.UP + hardlinked file: Reverse-updating a multiply linked
+(hardlinked) file on <sourceDir> may lead to follow-up effects.
 
-Corner case REV.UP + "--hLinks": If hardlink detection on <sourceDir> is active ("--hLinks" option), then Zaloha supports reverse-update of only the first link
-on <sourceDir> (the one that stays tagged as "file" (f) in CSV metadata after AWKHLINKS).
+Corner case REV.UP + "--hLinks": If hardlink detection on <sourceDir> is active
+("--hLinks" option), then Zaloha supports reverse-update of only the first link
+on <sourceDir> (the one that stays tagged as "file" (f) in CSV metadata
+after AWKHLINKS).
 
-Corner case if directory .Zaloha_metadata exists under <sourceDir> as well (e.g. in case of backups of backups): It will be ignored. If a backup of that directory
-is needed as well, it should be solved separately (Hint: if the secondary backup starts one directory higher, then .Zaloha_metadata of the original backup will be taken).
+Corner case if directory .Zaloha_metadata exists under <sourceDir> as well
+(e.g. in case of backups of backups): It will be ignored. If a backup of that
+directory is needed as well, it should be solved separately (Hint: if the
+secondary backup starts one directory higher, then .Zaloha_metadata of the
+original backup will be taken).
 
 ###########################################################
 
@@ -418,132 +627,170 @@ HOW ZALOHA WORKS INTERNALLY
 
 Handling and checking of input parameters should be self-explanatory.
 
-The actual program logic is embodied in AWK programs, which are contained in Zaloha as "here documents".
+The actual program logic is embodied in AWK programs, which are contained in
+Zaloha as "here documents".
 
-The AWK program AWKPARSER parses the FIND operands assembled from <findSourceOps> and <findGeneralOps> and constructs the FIND commands.
-The outputs of running these FIND commands are tab-separated CSV metadata files that contain all information needed for following steps.
-These CSV metadata files, however, must first be processed by AWKCLEANER to handle (escape) eventual tabs and newlines in filenames.
+The AWK program AWKPARSER parses the FIND operands assembled from
+<findSourceOps> and <findGeneralOps> and constructs the FIND commands.
+The outputs of running these FIND commands are tab-separated CSV metadata files
+that contain all information needed for following steps. These CSV metadata
+files, however, must first be processed by AWKCLEANER to handle (escape)
+eventual tabs and newlines in filenames.
 
-The cleaned CSV metadata files are then checked by AWKCHECKER for unexpected deviations (in which case an error is thrown and the processing stops).
+The cleaned CSV metadata files are then checked by AWKCHECKER for unexpected
+deviations (in which case an error is thrown and the processing stops).
 
-The next (optional) step is to detect hardlinks: the CSV metadata file from <sourceDir> is sorted by device number + inode number. This means that multiply-linked files
-will be in adjacent records. The AWK program AWKHLINKS evaluates this situation: The type of the first link will be kept as "file" (f),
+The next (optional) step is to detect hardlinks: the CSV metadata file from
+<sourceDir> is sorted by device number + inode number. This means that
+multiply-linked files will be in adjacent records. The AWK program AWKHLINKS
+evaluates this situation: The type of the first link will be kept as "file" (f),
 the types of the other links will be changed to "hardlinks" (h).
 
-Then comes the core function of Zaloha. The CSV metadata files from <sourceDir> and <backupDir> will be united and sorted by filename and the <sourceDir>/<backupDir> indicator.
-This means that objects existing in both directories will be in adjacent records, with the <backupDir> record coming first.
-The AWK program AWKDIFF evaluates this situation (as well as records from objects existing in only one of the directories), and writes target state
-of synchronized directories with actions to reach that target state.
+Then comes the core function of Zaloha. The CSV metadata files from <sourceDir>
+and <backupDir> will be united and sorted by filename and the Source/Backup
+indicator. This means that objects existing in both directories will be in
+adjacent records, with the <backupDir> record coming first. The AWK program
+AWKDIFF evaluates this situation (as well as records from objects existing in
+only one of the directories), and writes target state of synchronized
+directories with actions to reach that target state.
 
-The output of AWKDIFF is then sorted by filename in reverse order (so that parent directories come after their children) and post-processed by AWKPOSTPROC.
-AWKPOSTPROC modifies actions on parent directories of files to REV.NEW and other objects to KEEP on <backupDir>.
+The output of AWKDIFF is then sorted by filename in reverse order (so that
+parent directories come after their children) and post-processed by AWKPOSTPROC.
+AWKPOSTPROC modifies actions on parent directories of files to REV.NEW and other
+objects to KEEP on <backupDir>.
 
-The remaining code uses the produced data to perform actual work, and should be self-explanatory.
+The remaining code uses the produced data to perform actual work, and should be
+self-explanatory.
 
 ###########################################################
 
 TECHNIQUES FOR HANDLING OF WEIRD CHARACTERS IN FILENAMES
 
-Handling of "weird" characters in filenames was a special focus during development of Zaloha.
-Actually, it was an exercise of how far can be gone with shellscript alone, without reverting to a C program.
-Tested were: !"#$%&'()*+,-.:;<=>?@[\]^`{|}~, spaces, tabs, newlines, alert (bell) and a few national characters (above ASCII 127).
-Please note that on some filesystem types, some weird characters are not allowed at all.
+Handling of "weird" characters in filenames was a special focus during
+development of Zaloha. Actually, it was an exercise of how far can be gone with
+shellscript alone, without reverting to a C program. Tested were:
+!"#$%&'()*+,-.:;<=>?@[\]^`{|}~, spaces, tabs, newlines, alert (bell) and
+a few national characters (beyond ASCII 127). Please note that on some
+filesystem types, some weird characters are not allowed at all.
 
-Zaloha internally uses tab-separated CSV files, also tabs and newlines are major disruptors. The solution is based on the following idea:
-POSIX (the most "liberal" standard under which Zaloha must function) says that filenames may contain all characters except slash (/, the directory separator)
-and ASCII NUL. Hence, except these two, no character can be used as an escape character (if we do not want to introduce some re-coding).
-Further, ASCII NUL is unsuitable, as it is widely used as a string delimiter. Then, let's have a look at the directory separator itself:
-It cannot occur inside of filenames. It separates file and directory names in the paths. As filenames cannot have zero length, no two slashes can appear in sequence.
-The only exception is the naming convention for network-mounted directories, which may contain two consecutive slashes at the beginning.
-But three consecutive slashes (a triplet ///) are impossible. Hence, it is a waterproof escape sequence.
+Zaloha internally uses tab-separated CSV files, also tabs and newlines are major
+disruptors. The solution is based on the following idea: POSIX (the most
+"liberal" standard under which Zaloha must function) says that filenames may
+contain all characters except slash (/, the directory separator) and ASCII NUL.
+Hence, except these two, no character can be used as an escape character
+(if we do not want to introduce some re-coding). Further, ASCII NUL is not
+suitable, as it is widely used as a string delimiter. Then, let's have a look
+at the directory separator itself: It cannot occur inside of filenames.
+It separates file and directory names in the paths. As filenames cannot have
+zero length, no two slashes can appear in sequence. The only exception is the
+naming convention for network-mounted directories, which may contain two
+consecutive slashes at the beginning. But three consecutive slashes
+(a triplet ///) are impossible. Hence, it is a waterproof escape sequence.
 This opens the way to represent a tab as ///t and a newline as ///n.
 
-For display of filenames on terminal (and only there), control characters (other than tabs and newlines) are displayed as ///c, to avoid terminal disruption.
+For display of filenames on terminal (and only there), control characters (other
+than tabs and newlines) are displayed as ///c, to avoid terminal disruption.
 (Such control characters are still original in the CSV metadata files).
 
-Further, /// are used as leading fields in the CSV metadata files, to allow easy separation of record lines from continuation lines caused by newlines in filenames
-(it is impossible that continuation lines have /// as the first field, because filenames cannot contain the newline + /// sequence).
+Further, /// are used as first fields in the CSV metadata files, to allow easy
+separation of record lines from continuation lines caused by newlines in
+filenames (it is impossible that continuation lines have /// as the first field,
+because filenames cannot contain the newline + /// sequence).
 
-Finally, /// are used as terminator fields in the CSV metadata files, to be able to determine where the filenames end in a situation when they contain tabs and newlines
-(it is impossible that filenames produce a field containing /// alone, because filenames cannot contain the tab + /// sequence).
+Finally, /// are used as terminator fields in the CSV metadata files, to be able
+to determine where the filenames end in a situation when they contain tabs and
+newlines (it is impossible that filenames produce a field containing /// alone,
+because filenames cannot contain the tab + /// sequence).
 
-An additional challenge is passing of variable values to AWK. During its lexical parsing, AWK interprets backslash-led escape sequences.
-To avoid this, backslashes are converted to ///b in the bash script, and ///b are converted back to backslashes in the AWK programs.
+An additional challenge is passing of variable values to AWK. During its
+lexical parsing, AWK interprets backslash-led escape sequences. To avoid this,
+backslashes are converted to ///b in the bash script, and ///b are converted
+back to backslashes in the AWK programs.
 
-Zaloha checks that no input parameters contain ///, to avoid breaking of the internal escape logic from the outside.
-The only exception are <findSourceOps> and <findGeneralOps>, which may contain the ///d/ sequence.
+Zaloha checks that no input parameters contain ///, to avoid breaking of the
+internal escape logic from the outside. The only exception are <findSourceOps>
+and <findGeneralOps>, which may contain the ///d/ placeholder.
 
-In the shellscripts produced by Zaloha, single quoting is used, hence single quotes are disruptors. As a solution, the '"'"' quoting technique is used.
+In the shellscripts produced by Zaloha, single quoting is used, hence single
+quotes are disruptors. As a solution, the '"'"' quoting technique is used.
 
-In the CSV metadata files 330 through 500 (i.e. those which undergo the sorts) slashes are appended to file's paths and all slashes are then converted to ///s.
-This is to ensure correct sort ordering. Imagine the ordering bugs which would happen otherwise:
-  Case 1: given dir and dir!, they would be sort ordered: dir, dir!, dir!/subdir, dir/subdir.
-  Case 2: given dir and dir<tab>ectory, they would be sort ordered: dir/!subdir1, dir///tectory, dir/subdir2.
+In the CSV metadata files 330 through 500 (i.e. those which undergo the sorts)
+directory separators (/) are appended to file's paths and all directory
+separators are then converted to ///s. This is to ensure correct sort ordering.
+Imagine the ordering bugs which would happen otherwise:
+  Case 1: given dir and dir!, they would be sort ordered:
+          dir, dir!, dir!/subdir, dir/subdir.
+  Case 2: given dir and dir<tab>ectory, they would be sort ordered:
+          dir/!subdir1, dir///tectory, dir/subdir2.
 
-Zaloha does not contain any explicit handling of national characters in filenames (= characters beyond ASCII 127).
-It is assumed that the commands used by Zaloha handle them transparently (which should be tested on environments where this topic is relevant).
-<sourceDir> and <backupDir> must use the same code page for national characters in filenames, because Zaloha does not contain any code page conversions.
+Zaloha does not contain any explicit handling of national characters in
+filenames (= characters beyond ASCII 127). It is assumed that the commands used
+by Zaloha handle them transparently (which should be tested on environments
+where this topic is relevant). <sourceDir> and <backupDir> must use the same
+code page for national characters in filenames, because Zaloha does not contain
+any code page conversions.
 
 ###########################################################
-
-DEFINITION OF INDIVIDUAL FILES IN METADATA DIRECTORY OF ZALOHA:
 ZALOHADOCU
+}
 
-f000Base="000_parameters.csv"            # parameters under which Zaloha was invoked and internal variables
+# DEFINITIONS OF INDIVIDUAL FILES IN METADATA DIRECTORY OF ZALOHA
 
-f100Base="100_awkpreproc.awk"            # AWK preprocessor for other AWK programs
-f102Base="102_xtrace2term.awk"           # AWK program for terminal display of shell traces (with control characters escaped), including color handling
-f104Base="104_actions2term.awk"          # AWK program for terminal display of actions (with control characters escaped), including color handling
-f106Base="106_parser.awk"                # AWK program for parsing of find arguments and construction of FIND commands
-f110Base="110_cleaner.awk"               # AWK program for handling of tabs and newlines in raw outputs of FIND
-f130Base="130_checker.awk"               # AWK program for checking
-f150Base="150_hlinks.awk"                # AWK program for hardlink detection (inode-deduplication)
-f170Base="170_diff.awk"                  # AWK program for difference processing
-f190Base="190_postproc.awk"              # AWK program for difference post-processing and splitting off Exec1 actions
+f000Base="000_parameters.csv"        # parameters under which Zaloha was invoked and internal variables
 
-f200Base="200_find_lastrun.sh"           # shellscript for FIND on <backupDir>/<zalohaDir>/999_mark_executed
-f210Base="210_find_source.sh"            # shellscript for FIND on <sourceDir>
-f220Base="220_find_backup.sh"            # shellscript for FIND on <backupDir>
+f100Base="100_awkpreproc.awk"        # AWK preprocessor for other AWK programs
+f102Base="102_xtrace2term.awk"       # AWK program for terminal display of shell traces (with control characters escaped), including color handling
+f104Base="104_actions2term.awk"      # AWK program for terminal display of actions (with control characters escaped), including color handling
+f106Base="106_parser.awk"            # AWK program for parsing of find arguments and construction of FIND commands
+f110Base="110_cleaner.awk"           # AWK program for handling of tabs and newlines in raw outputs of FIND
+f130Base="130_checker.awk"           # AWK program for checking
+f150Base="150_hlinks.awk"            # AWK program for hardlink detection (inode-deduplication)
+f170Base="170_diff.awk"              # AWK program for difference processing
+f190Base="190_postproc.awk"          # AWK program for difference post-processing and splitting off Exec1 actions
 
-f300Base="300_lastrun.csv"               # output of FIND on <backupDir>/<zalohaDir>/999_mark_executed
-f310Base="310_source_raw.csv"            # raw output of FIND on <sourceDir>
-f320Base="320_backup_raw.csv"            # raw output of FIND on <backupDir>
-f330Base="330_source_clean.csv"          # <sourceDir> file list cleaned (escaped tabs and newlines)
-f340Base="340_backup_clean.csv"          # <backupDir> file list cleaned (escaped tabs and newlines)
-f350Base="350_source_s_hlinks.csv"       # <sourceDir> file list sorted for hardlink detection (inode-deduplication)
-f360Base="360_source_hlinks.csv"         # <sourceDir> file list after hardlink detection (inode-deduplication)
-f370Base="370_union_s_diff.csv"          # <sourceDir> + <backupDir> file lists united and sorted for difference processing
-f380Base="380_diff.csv"                  # result of difference processing (target state with actions)
-f390Base="390_diff_r_post.csv"           # difference result reverse sorted for post-processing and splitting off Exec1 actions
+f200Base="200_find_lastrun.sh"       # shellscript for FIND on <backupDir>/<zalohaDir>/999_mark_executed
+f210Base="210_find_source.sh"        # shellscript for FIND on <sourceDir>
+f220Base="220_find_backup.sh"        # shellscript for FIND on <backupDir>
 
-f405Base="405_select23.awk"              # AWK program for selection of Exec2 and Exec3 actions
-f410Base="410_exec1.awk"                 # AWK program for preparation of shellscript for Exec1
-f420Base="420_exec2.awk"                 # AWK program for preparation of shellscript for Exec2
-f430Base="430_exec3.awk"                 # AWK program for preparation of shellscript for Exec3
-f490Base="490_touch.awk"                 # AWK program for preparation of shellscript to touch file 999_mark_executed
+f300Base="300_lastrun.csv"           # output of FIND on <backupDir>/<zalohaDir>/999_mark_executed
+f310Base="310_source_raw.csv"        # raw output of FIND on <sourceDir>
+f320Base="320_backup_raw.csv"        # raw output of FIND on <backupDir>
+f330Base="330_source_clean.csv"      # <sourceDir> file list cleaned (escaped tabs and newlines)
+f340Base="340_backup_clean.csv"      # <backupDir> file list cleaned (escaped tabs and newlines)
+f350Base="350_source_s_hlinks.csv"   # <sourceDir> file list sorted for hardlink detection (inode-deduplication)
+f360Base="360_source_hlinks.csv"     # <sourceDir> file list after hardlink detection (inode-deduplication)
+f370Base="370_union_s_diff.csv"      # <sourceDir> + <backupDir> file lists united and sorted for difference processing
+f380Base="380_diff.csv"              # result of difference processing (target state with actions)
+f390Base="390_diff_r_post.csv"       # difference result reverse sorted for post-processing and splitting off Exec1 actions
 
-f500Base="500_target_r.csv"              # target state of synchronized directories reverse sorted
-f505Base="505_target.csv"                # target state of synchronized directories
-f510Base="510_exec1.csv"                 # Exec1 actions (reverse sorted)
-f520Base="520_exec2.csv"                 # Exec2 actions
-f530Base="530_exec3.csv"                 # Exec3 actions
+f405Base="405_select23.awk"          # AWK program for selection of Exec2 and Exec3 actions
+f410Base="410_exec1.awk"             # AWK program for preparation of shellscript for Exec1
+f420Base="420_exec2.awk"             # AWK program for preparation of shellscript for Exec2
+f430Base="430_exec3.awk"             # AWK program for preparation of shellscript for Exec3
+f490Base="490_touch.awk"             # AWK program for preparation of shellscript to touch file 999_mark_executed
 
-f610Base="610_exec1.sh"                  # shellscript for Exec1
-f620Base="620_exec2.sh"                  # shellscript for Exec2
-f630Base="630_exec3.sh"                  # shellscript for Exec3
-f690Base="690_touch.sh"                  # shellscript to touch file 999_mark_executed
+f500Base="500_target_r.csv"          # target state of synchronized directories reverse sorted
+f505Base="505_target.csv"            # target state of synchronized directories
+f510Base="510_exec1.csv"             # Exec1 actions (reverse sorted)
+f520Base="520_exec2.csv"             # Exec2 actions
+f530Base="530_exec3.csv"             # Exec3 actions
 
-f700Base="700_restore.awk"               # AWK program for preparation of shellscripts for the case of restore
+f610Base="610_exec1.sh"              # shellscript for Exec1
+f620Base="620_exec2.sh"              # shellscript for Exec2
+f630Base="630_exec3.sh"              # shellscript for Exec3
+f690Base="690_touch.sh"              # shellscript to touch file 999_mark_executed
 
-f800Base="800_restore_dirs.sh"           # for the case of restore: shellscript to restore directories
-f810Base="810_restore_files.sh"          # for the case of restore: shellscript to restore files
-f820Base="820_restore_sym_links.sh"      # for the case of restore: shellscript to restore symbolic links
-f830Base="830_restore_hardlinks.sh"      # for the case of restore: shellscript to restore hardlinks
-f840Base="840_restore_user_own.sh"       # for the case of restore: shellscript to restore user ownerships
-f850Base="850_restore_group_own.sh"      # for the case of restore: shellscript to restore group ownerships
-f860Base="860_restore_mode.sh"           # for the case of restore: shellscript to restore modes (permission bits)
+f700Base="700_restore.awk"           # AWK program for preparation of shellscripts for the case of restore
 
-f999Base="999_mark_executed"             # empty touchfile marking execution of actions
+f800Base="800_restore_dirs.sh"       # for the case of restore: shellscript to restore directories
+f810Base="810_restore_files.sh"      # for the case of restore: shellscript to restore files
+f820Base="820_restore_sym_links.sh"  # for the case of restore: shellscript to restore symbolic links
+f830Base="830_restore_hardlinks.sh"  # for the case of restore: shellscript to restore hardlinks
+f840Base="840_restore_user_own.sh"   # for the case of restore: shellscript to restore user ownerships
+f850Base="850_restore_group_own.sh"  # for the case of restore: shellscript to restore group ownerships
+f860Base="860_restore_mode.sh"       # for the case of restore: shellscript to restore modes (permission bits)
+
+f999Base="999_mark_executed"         # empty touchfile marking execution of actions
 
 ###########################################################
 set -e
@@ -595,12 +842,12 @@ LBRACKET="["
 RBRACKETPATTERN="\\]"
 RBRACKET="]"
 CNTRLPATTERN="[[:cntrl:]]"
-TRIPLETDSEP="///d/"         # placeholder for <sourceDir> or <backupDir> followed by directory separator
-TRIPLETT="///t"             # escape for tab
-TRIPLETN="///n"             # escape for newline
-TRIPLETB="///b"             # escape for backslash
-TRIPLETC="///c"             # display of control characters on terminal
-TRIPLET="///"               # escape sequence, leading field, terminator field
+TRIPLETDSEP="///d/"  # placeholder for <sourceDir> or <backupDir> followed by directory separator
+TRIPLETT="///t"      # escape for tab
+TRIPLETN="///n"      # escape for newline
+TRIPLETB="///b"      # escape for backslash
+TRIPLETC="///c"      # display of control characters on terminal
+TRIPLET="///"        # escape sequence, leading field, terminator field
 
 FSTAB=$'\t'
 TERMNORM=$'\033'"[0m"
@@ -638,6 +885,7 @@ noExec3Hdr=0
 noProgress=0
 color=0
 lTest=0
+help=0
 
 for tmpVal in "${@}"
 do
@@ -671,25 +919,31 @@ do
     --noProgress)        noProgress=1 ;                   shift ;;
     --color)             color=1 ;                        shift ;;
     --lTest)             lTest=1 ;                        shift ;;
-    *) error_exit "Unknown option: ${tmpVal}" ;;
+    --help)              help=1 ;                         shift ;;
+    *) error_exit "Unknown option ${tmpVal}, get help via Zaloha.sh --help" ;;
   esac
 done
 
+if [ ${help} -eq 1 ]; then
+  zaloha_docu
+  exit 0
+fi
+
 ###########################################################
 if [ "" == "${sourceDir}" ]; then
-    error_exit "<sourceDir> is mandatory"
+  error_exit "<sourceDir> is mandatory"
 fi
 if [ "${sourceDir/${TRIPLET}/}" != "${sourceDir}" ]; then
-    error_exit "<sourceDir> contains the directory separator triplet (${TRIPLET})"
+  error_exit "<sourceDir> contains the directory separator triplet (${TRIPLET})"
 fi
 if [ "/" != "${sourceDir:0:1}" ] && [ "./" != "${sourceDir:0:2}" ]; then
-    sourceDir="./${sourceDir}"
+  sourceDir="./${sourceDir}"
 fi
 if [ "/" != "${sourceDir: -1:1}" ]; then
-    sourceDir="${sourceDir}/"
+  sourceDir="${sourceDir}/"
 fi
 if [ ${noDirChecks} -eq 0 ] && [ ! -d "${sourceDir}" ]; then
-    error_exit "<sourceDir> is not a directory"
+  error_exit "<sourceDir> is not a directory"
 fi
 sourceDirAwk="${sourceDir//${BSLASHPATTERN}/${TRIPLETB}}"
 sourceDirPattAwk="${sourceDir//${BSLASHPATTERN}/${TRIPLETB}${TRIPLETB}}"
@@ -709,19 +963,19 @@ fi
 
 ###########################################################
 if [ "" == "${backupDir}" ]; then
-    error_exit "<backupDir> is mandatory"
+  error_exit "<backupDir> is mandatory"
 fi
 if [ "${backupDir/${TRIPLET}/}" != "${backupDir}" ]; then
-    error_exit "<backupDir> contains the directory separator triplet (${TRIPLET})"
+  error_exit "<backupDir> contains the directory separator triplet (${TRIPLET})"
 fi
 if [ "/" != "${backupDir:0:1}" ] && [ "./" != "${backupDir:0:2}" ]; then
-    backupDir="./${backupDir}"
+  backupDir="./${backupDir}"
 fi
 if [ "/" != "${backupDir: -1:1}" ]; then
-    backupDir="${backupDir}/"
+  backupDir="${backupDir}/"
 fi
 if [ ${noDirChecks} -eq 0 ] && [ ! -d "${backupDir}" ]; then
-    error_exit "<backupDir> is not a directory"
+  error_exit "<backupDir> is not a directory"
 fi
 backupDirAwk="${backupDir//${BSLASHPATTERN}/${TRIPLETB}}"
 backupDirPattAwk="${backupDir//${BSLASHPATTERN}/${TRIPLETB}${TRIPLETB}}"
@@ -742,7 +996,7 @@ fi
 ###########################################################
 tmpVal="${findSourceOps//${TRIPLETDSEP}/M}"
 if [ "${tmpVal/${TRIPLET}/}" != "${tmpVal}" ]; then
-    error_exit "<findSourceOps> contains the directory separator triplet (${TRIPLET})"
+  error_exit "<findSourceOps> contains the directory separator triplet (${TRIPLET})"
 fi
 findSourceOpsAwk="${findSourceOps//${BSLASHPATTERN}/${TRIPLETB}}"
 findSourceOpsEsc="${findSourceOps//${TAB}/${TRIPLETT}}"
@@ -754,15 +1008,15 @@ findGeneralOpsInternal="${findGeneralOpsInternal} -ipath ${TRIPLETDSEP}\$RECYCLE
 findGeneralOpsInternal="${findGeneralOpsInternal} -path ${TRIPLETDSEP}.Trash-[0-9]* -prune -o"
 findGeneralOpsInternal="${findGeneralOpsInternal} -path ${TRIPLETDSEP}lost+found -prune -o"
 if [ "M+" == "${findGeneralOps:0:2}" ]; then
-    findGeneralOps="${findGeneralOpsInternal} ${findGeneralOps:2}"
+  findGeneralOps="${findGeneralOpsInternal} ${findGeneralOps:2}"
 elif [ "M" == "${findGeneralOps:0:1}" ]; then
-    findGeneralOps="${findGeneralOps:1}"
+  findGeneralOps="${findGeneralOps:1}"
 else
-    findGeneralOps="${findGeneralOpsInternal}"
+  findGeneralOps="${findGeneralOpsInternal}"
 fi
 tmpVal="${findGeneralOps//${TRIPLETDSEP}/M}"
 if [ "${tmpVal/${TRIPLET}/}" != "${tmpVal}" ]; then
-    error_exit "<findGeneralOps> contains the directory separator triplet (${TRIPLET})"
+  error_exit "<findGeneralOps> contains the directory separator triplet (${TRIPLET})"
 fi
 findGeneralOpsAwk="${findGeneralOps//${BSLASHPATTERN}/${TRIPLETB}}"
 findGeneralOpsEsc="${findGeneralOps//${TAB}/${TRIPLETT}}"
@@ -772,23 +1026,23 @@ findGeneralOpsEsc="${findGeneralOpsEsc//${NLINE}/${TRIPLETN}}"
 metaDirInternalBase=".Zaloha_metadata"
 metaDirInternal="${backupDir}${metaDirInternalBase}"
 if [ "M" == "${metaDir:0:1}" ]; then
-    metaDir="${metaDir:1}"
-    metaDirDefault=0
+  metaDir="${metaDir:1}"
+  metaDirDefault=0
 else
-    metaDir="${metaDirInternal}"
-    metaDirDefault=1
+  metaDir="${metaDirInternal}"
+  metaDirDefault=1
 fi
 if [ "" == "${metaDir}" ]; then
-    error_exit "<metaDir> is mandatory if --metaDir option is given"
+  error_exit "<metaDir> is mandatory if --metaDir option is given"
 fi
 if [ "/" != "${metaDir:0:1}" ] && [ "./" != "${metaDir:0:2}" ]; then
-    metaDir="./${metaDir}"
+  metaDir="./${metaDir}"
 fi
 if [ "/" != "${metaDir: -1:1}" ]; then
-    metaDir="${metaDir}/"
+  metaDir="${metaDir}/"
 fi
 if [ "${metaDir/${TRIPLET}/}" != "${metaDir}" ]; then
-    error_exit "<metaDir> contains the directory separator triplet (${TRIPLET})"
+  error_exit "<metaDir> contains the directory separator triplet (${TRIPLET})"
 fi
 metaDirAwk="${metaDir//${BSLASHPATTERN}/${TRIPLETB}}"
 metaDirPattAwk="${metaDir//${BSLASHPATTERN}/${TRIPLETB}${TRIPLETB}}"
@@ -801,15 +1055,15 @@ metaDirEsc="${metaDirEsc//${NLINE}/${TRIPLETN}}"
 
 ###########################################################
 if [ ${noExec1Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
-    error_exit "Option --noExec1Hdr can be used only together with option --noExec"
+  error_exit "Option --noExec1Hdr can be used only together with option --noExec"
 fi
 
 if [ ${noExec2Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
-    error_exit "Option --noExec2Hdr can be used only together with option --noExec"
+  error_exit "Option --noExec2Hdr can be used only together with option --noExec"
 fi
 
 if [ ${noExec3Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
-    error_exit "Option --noExec3Hdr can be used only together with option --noExec"
+  error_exit "Option --noExec3Hdr can be used only together with option --noExec"
 fi
 
 ###########################################################
@@ -1051,11 +1305,11 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, outFile )
   gsub( QUOTEREGEX, QUOTEESC, findDir )
   gsub( QUOTEREGEX, QUOTEESC, outFile )
-  cmd = "find '" findDir "'"      # FIND command being constructed
-  wrd = ""                        # word of FIND command being constructed
-  iwd = 0                         # flag inside of word
-  idq = 0                         # flag inside of double-quote
-  bsl = 0                         # flag backslash remembered
+  cmd = "find '" findDir "'"  # FIND command being constructed
+  wrd = ""                    # word of FIND command being constructed
+  iwd = 0                     # flag inside of word
+  idq = 0                     # flag inside of double-quote
+  bsl = 0                     # flag backslash remembered
   findOps = findOps " "
   for ( i = 1; i <= length( findOps ); i++ ) {
     c = substr( findOps, i, 1 )
@@ -1092,7 +1346,7 @@ BEGIN {
     if (( 0 == iwd ) && ( "" != wrd )) {
       j = index( wrd, TRIPLETDSEP )
       if ( 0 != j ) {
-        wpp = ""                  # word of FIND command post-processed
+        wpp = ""              # word of FIND command post-processed
         if ( 1 < j ) {
           wpp = wpp substr( wrd, 1, j - 1 )
         }
@@ -1116,22 +1370,22 @@ BEGIN {
     error_exit( "<findOps> contains unpaired double quote" )
   }
   cmd = cmd " -printf '"
-  cmd = cmd TRIPLET                    # column  1: leading field
-  cmd = cmd "\\t" srcBackup            # column  2: S = <sourceDir>, B = <backupDir>, L = last run record
-  cmd = cmd "\\t%y"                    # column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
-  cmd = cmd "\\t%s"                    # column  4: file's size in bytes
-  cmd = cmd "\\t%Ts"                   # column  5: file's last modification time, seconds since 01/01/1970
-  cmd = cmd "\\t%F"                    # column  6: type of the filesystem the file is on
-  cmd = cmd "\\t%D"                    # column  7: device number the file is on
-  cmd = cmd "\\t%i"                    # column  8: file's inode number
-  cmd = cmd "\\t%n"                    # column  9: number of hardlinks to file
-  cmd = cmd "\\t%u"                    # column 10: file's user name
-  cmd = cmd "\\t%g"                    # column 11: file's group name
-  cmd = cmd "\\t%m"                    # column 12: file's permission bits (in octal)
-  cmd = cmd "\\t%P"                    # column 13: file's path with <sourceDir> or <backupDir> stripped
-  cmd = cmd "\\t" TRIPLET              # column 14: terminator field
-  cmd = cmd "\\t%l"                    # column 15: object of symbolic link
-  cmd = cmd "\\t" TRIPLET              # column 16: terminator field
+  cmd = cmd TRIPLET           # column  1: leading field
+  cmd = cmd "\\t" srcBackup   # column  2: S = <sourceDir>, B = <backupDir>, L = last run record
+  cmd = cmd "\\t%y"           # column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+  cmd = cmd "\\t%s"           # column  4: file's size in bytes
+  cmd = cmd "\\t%Ts"          # column  5: file's last modification time, seconds since 01/01/1970
+  cmd = cmd "\\t%F"           # column  6: type of the filesystem the file is on
+  cmd = cmd "\\t%D"           # column  7: device number the file is on
+  cmd = cmd "\\t%i"           # column  8: file's inode number
+  cmd = cmd "\\t%n"           # column  9: number of hardlinks to file
+  cmd = cmd "\\t%u"           # column 10: file's user name
+  cmd = cmd "\\t%g"           # column 11: file's group name
+  cmd = cmd "\\t%m"           # column 12: file's permission bits (in octal)
+  cmd = cmd "\\t%P"           # column 13: file's path with <sourceDir> or <backupDir> stripped
+  cmd = cmd "\\t" TRIPLET     # column 14: terminator field
+  cmd = cmd "\\t%l"           # column 15: object of symbolic link
+  cmd = cmd "\\t" TRIPLET     # column 16: terminator field
   cmd = cmd "\\n' > '" outFile "'"
   BIN_BASH
   print "BASH_XTRACEFD=1"
@@ -1427,24 +1681,24 @@ BEGIN {
     if ( md != $12 ) {
       error_exit( "Unexpected falsely detected hardlink (mode differs)" )
     }
-    $3 = "h"    # hardlink
-    $15 = pt    # object of hardlink
+    $3 = "h"  # hardlink
+    $15 = pt  # object of hardlink
     if ( "" != $15 ) {
       gsub( TRIPLETSREGEX, SLASH, $15 )
       $15 = substr( $15, 1, length( $15 ) - 1 )
     }
   } else {
-    hcn = 1     # detected hardlink count
-    tp = $3     # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
-    sz = $4     # previous record's column  4: file's size in bytes
-    tm = $5     # previous record's column  5: file's last modification time, seconds since 01/01/1970
-    dv = $7     # previous record's column  7: device number the file is on
-    id = $8     # previous record's column  8: file's inode number
-    nh = $9     # previous record's column  9: number of hardlinks to file
-    us = $10    # previous record's column 10: file's user name
-    gr = $11    # previous record's column 11: file's group name
-    md = $12    # previous record's column 12: file's permission bits (in octal)
-    pt = $13    # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
+    hcn = 1   # detected hardlink count
+    tp = $3   # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+    sz = $4   # previous record's column  4: file's size in bytes
+    tm = $5   # previous record's column  5: file's last modification time, seconds since 01/01/1970
+    dv = $7   # previous record's column  7: device number the file is on
+    id = $8   # previous record's column  8: file's inode number
+    nh = $9   # previous record's column  9: number of hardlinks to file
+    us = $10  # previous record's column 10: file's user name
+    gr = $11  # previous record's column 11: file's group name
+    md = $12  # previous record's column 12: file's permission bits (in octal)
+    pt = $13  # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
   }
   print
 }
@@ -1699,19 +1953,19 @@ function process_previous_record() {
       prr = 1
     }
   }
-  sb = $2       # previous record's column  2: S = <sourceDir>, B = <backupDir>, L = last run record
-  tp = $3       # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
-  sz = $4       # previous record's column  4: file's size in bytes
-  tm = $5       # previous record's column  5: file's last modification time, seconds since 01/01/1970
-  ft = $6       # previous record's column  6: type of the filesystem the file is on
-  dv = $7       # previous record's column  7: device number the file is on
-  id = $8       # previous record's column  8: file's inode number
-  nh = $9       # previous record's column  9: number of hardlinks to file
-  us = $10      # previous record's column 10: file's user name
-  gr = $11      # previous record's column 11: file's group name
-  md = $12      # previous record's column 12: file's permission bits (in octal)
-  pt = $13      # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
-  ol = $15      # previous record's column 15: object of symbolic link
+  sb = $2   # previous record's column  2: S = <sourceDir>, B = <backupDir>, L = last run record
+  tp = $3   # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+  sz = $4   # previous record's column  4: file's size in bytes
+  tm = $5   # previous record's column  5: file's last modification time, seconds since 01/01/1970
+  ft = $6   # previous record's column  6: type of the filesystem the file is on
+  dv = $7   # previous record's column  7: device number the file is on
+  id = $8   # previous record's column  8: file's inode number
+  nh = $9   # previous record's column  9: number of hardlinks to file
+  us = $10  # previous record's column 10: file's user name
+  gr = $11  # previous record's column 11: file's group name
+  md = $12  # previous record's column 12: file's permission bits (in octal)
+  pt = $13  # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
+  ol = $15  # previous record's column 15: object of symbolic link
 }
 END {
   if ( 1 == prr ) {
@@ -1735,16 +1989,16 @@ stop_progress
 
 start_progress "Differences processing"
 
-awk ${awkLint}                              \
-    -f "${f170}"                            \
-    -v revNew=${revNew}                     \
-    -v revUp=${revUp}                       \
-    -v ok3600s=${ok3600s}                   \
-    -v noUnlink=${noUnlink}                 \
-    -v pUser=${pUser}                       \
-    -v pGroup=${pGroup}                     \
-    -v pMode=${pMode}                       \
-    "${f300}" "${f370}"                     > "${f380}"
+awk ${awkLint}               \
+    -f "${f170}"             \
+    -v revNew=${revNew}      \
+    -v revUp=${revUp}        \
+    -v ok3600s=${ok3600s}    \
+    -v noUnlink=${noUnlink}  \
+    -v pUser=${pUser}        \
+    -v pGroup=${pGroup}      \
+    -v pMode=${pMode}        \
+    "${f300}" "${f370}"      > "${f380}"
 
 optim_csv_after_use "${f370}"
 
@@ -1808,10 +2062,10 @@ stop_progress
 
 start_progress "Post-processing and splitting off Exec1"
 
-awk ${awkLint}                              \
-    -f "${f190}"                            \
-    -v f500="${f500Awk}"                    \
-    -v f510="${f510Awk}"                    \
+awk ${awkLint}            \
+    -f "${f190}"          \
+    -v f500="${f500Awk}"  \
+    -v f510="${f510Awk}"  \
     "${f390}"
 
 optim_csv_after_use "${f390}"
@@ -1849,9 +2103,9 @@ AWKSELECT23
 start_progress "Sorting (4) and selecting Exec2 and Exec3"
 
 LC_ALL=C sort -t "${FSTAB}" -k13,13 "${f500}" | awk ${awkLint} \
-    -f "${f405}"                            \
-    -v f520="${f520Awk}"                    \
-    -v f530="${f530Awk}"                    > "${f505}"
+    -f "${f405}"          \
+    -v f520="${f520Awk}"  \
+    -v f530="${f530Awk}"  > "${f505}"
 
 optim_csv_after_use "${f500}"
 
@@ -1899,12 +2153,12 @@ AWKEXEC1
 
 start_progress "Preparing shellscript for Exec1"
 
-awk ${awkLint}                              \
-    -f "${f410}"                            \
-    -v backupDir="${backupDirAwk}"          \
-    -v noExec=${noExec}                     \
-    -v noExec1Hdr=${noExec1Hdr}             \
-    "${f510}"                               > "${f610}"
+awk ${awkLint}                      \
+    -f "${f410}"                    \
+    -v backupDir="${backupDirAwk}"  \
+    -v noExec=${noExec}             \
+    -v noExec1Hdr=${noExec1Hdr}     \
+    "${f510}"                       > "${f610}"
 
 stop_progress
 
@@ -2015,18 +2269,18 @@ AWKEXEC2
 
 start_progress "Preparing shellscript for Exec2"
 
-awk ${awkLint}                              \
-    -f "${f420}"                            \
-    -v sourceDir="${sourceDirAwk}"          \
-    -v backupDir="${backupDirAwk}"          \
-    -v noExec=${noExec}                     \
-    -v noUnlink=${noUnlink}                 \
-    -v touch=${touch}                       \
-    -v pUser=${pUser}                       \
-    -v pGroup=${pGroup}                     \
-    -v pMode=${pMode}                       \
-    -v noExec2Hdr=${noExec2Hdr}             \
-    "${f520}"                               > "${f620}"
+awk ${awkLint}                      \
+    -f "${f420}"                    \
+    -v sourceDir="${sourceDirAwk}"  \
+    -v backupDir="${backupDirAwk}"  \
+    -v noExec=${noExec}             \
+    -v noUnlink=${noUnlink}         \
+    -v touch=${touch}               \
+    -v pUser=${pUser}               \
+    -v pGroup=${pGroup}             \
+    -v pMode=${pMode}               \
+    -v noExec2Hdr=${noExec2Hdr}     \
+    "${f520}"                       > "${f620}"
 
 stop_progress
 
@@ -2135,17 +2389,17 @@ if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
 
   start_progress "Preparing shellscript for Exec3"
 
-  awk ${awkLint}                              \
-      -f "${f430}"                            \
-      -v sourceDir="${sourceDirAwk}"          \
-      -v backupDir="${backupDirAwk}"          \
-      -v noExec=${noExec}                     \
-      -v touch=${touch}                       \
-      -v pRevUser=${pRevUser}                 \
-      -v pRevGroup=${pRevGroup}               \
-      -v pRevMode=${pRevMode}                 \
-      -v noExec3Hdr=${noExec3Hdr}             \
-      "${f530}"                               > "${f630}"
+  awk ${awkLint}                      \
+      -f "${f430}"                    \
+      -v sourceDir="${sourceDirAwk}"  \
+      -v backupDir="${backupDirAwk}"  \
+      -v noExec=${noExec}             \
+      -v touch=${touch}               \
+      -v pRevUser=${pRevUser}         \
+      -v pRevGroup=${pRevGroup}       \
+      -v pRevMode=${pRevMode}         \
+      -v noExec3Hdr=${noExec3Hdr}     \
+      "${f530}"                       > "${f630}"
 
   stop_progress
 
@@ -2176,11 +2430,11 @@ AWKTOUCH
 
 start_progress "Preparing shellscript to touch file 999"
 
-awk ${awkLint}                              \
-    -f "${f490}"                            \
-    -v metaDir="${metaDirAwk}"              \
-    -v f000Base="${f000Base}"               \
-    -v f999Base="${f999Base}"               > "${f690}"
+awk ${awkLint}                  \
+    -f "${f490}"                \
+    -v metaDir="${metaDirAwk}"  \
+    -v f000Base="${f000Base}"   \
+    -v f999Base="${f999Base}"   > "${f690}"
 
 stop_progress
 
@@ -2311,17 +2565,17 @@ if [ ${noRestore} -eq 0 ]; then
 
   start_progress "Preparing shellscripts for case of restore"
 
-  awk ${awkLint}                            \
-      -f "${f700}"                          \
-      -v backupDir="${backupDirAwk}"        \
-      -v restoreDir="${sourceDirAwk}"       \
-      -v f800="${f800Awk}"                  \
-      -v f810="${f810Awk}"                  \
-      -v f820="${f820Awk}"                  \
-      -v f830="${f830Awk}"                  \
-      -v f840="${f840Awk}"                  \
-      -v f850="${f850Awk}"                  \
-      -v f860="${f860Awk}"                  \
+  awk ${awkLint}                       \
+      -f "${f700}"                     \
+      -v backupDir="${backupDirAwk}"   \
+      -v restoreDir="${sourceDirAwk}"  \
+      -v f800="${f800Awk}"             \
+      -v f810="${f810Awk}"             \
+      -v f820="${f820Awk}"             \
+      -v f830="${f830Awk}"             \
+      -v f840="${f840Awk}"             \
+      -v f850="${f850Awk}"             \
+      -v f860="${f860Awk}"             \
       "${f505}"
 
   stop_progress
