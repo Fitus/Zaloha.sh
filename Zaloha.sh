@@ -323,7 +323,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 
     Examples: * exclude directory <sourceDir>/.git,
               * exclude all directories Windows Security
-              * exclude and all files My "Secret" Things
+              * exclude all files My "Secret" Things
     (double-quoted and single-quoted versions):
 
     --findSourceOps="-path ///d/.git -prune -o"
@@ -714,10 +714,10 @@ and <findGeneralOps>, which may contain the ///d/ placeholder.
 In the shellscripts produced by Zaloha, single quoting is used, hence single
 quotes are disruptors. As a solution, the '"'"' quoting technique is used.
 
-In the CSV metadata files 330 through 500 (i.e. those which undergo the sorts)
-directory separators (/) are appended to file's paths and all directory
-separators are then converted to ///s. This is to ensure correct sort ordering.
-Imagine the ordering bugs which would happen otherwise:
+In the CSV metadata files 330 through 500 (i.e. those which undergo the sorts),
+file's paths (field 13) have directory separators (/) appended and all
+directory separators then converted to ///s. This is to ensure correct sort
+ordering. Imagine the ordering bugs which would happen otherwise:
   Case 1: given dir and dir!, they would be sort ordered:
           dir, dir!, dir!/subdir, dir/subdir.
   Case 2: given dir and dir<tab>ectory, they would be sort ordered:
@@ -739,29 +739,29 @@ ZALOHADOCU
 f000Base="000_parameters.csv"        # parameters under which Zaloha was invoked and internal variables
 
 f100Base="100_awkpreproc.awk"        # AWK preprocessor for other AWK programs
-f102Base="102_xtrace2term.awk"       # AWK program for terminal display of shell traces (with control characters escaped), including color handling
-f104Base="104_actions2term.awk"      # AWK program for terminal display of actions (with control characters escaped), including color handling
-f106Base="106_parser.awk"            # AWK program for parsing of find arguments and construction of FIND commands
-f110Base="110_cleaner.awk"           # AWK program for handling of tabs and newlines in raw outputs of FIND
+f102Base="102_xtrace2term.awk"       # AWK program for terminal display of shell traces (with control characters escaped), color handling
+f104Base="104_actions2term.awk"      # AWK program for terminal display of actions (with control characters escaped), color handling
+f106Base="106_parser.awk"            # AWK program for parsing of FIND operands and construction of FIND commands
+f110Base="110_cleaner.awk"           # AWK program for handling of raw outputs of FIND (escape tabs and newlines, field 13 handling)
 f130Base="130_checker.awk"           # AWK program for checking
 f150Base="150_hlinks.awk"            # AWK program for hardlink detection (inode-deduplication)
-f170Base="170_diff.awk"              # AWK program for difference processing
-f190Base="190_postproc.awk"          # AWK program for difference post-processing and splitting off Exec1 actions
+f170Base="170_diff.awk"              # AWK program for differences processing
+f190Base="190_postproc.awk"          # AWK program for differences post-processing and splitting off Exec1 actions
 
-f200Base="200_find_lastrun.sh"       # shellscript for FIND on <backupDir>/<zalohaDir>/999_mark_executed
+f200Base="200_find_lastrun.sh"       # shellscript for FIND on <metaDir>/999_mark_executed
 f210Base="210_find_source.sh"        # shellscript for FIND on <sourceDir>
 f220Base="220_find_backup.sh"        # shellscript for FIND on <backupDir>
 
-f300Base="300_lastrun.csv"           # output of FIND on <backupDir>/<zalohaDir>/999_mark_executed
+f300Base="300_lastrun.csv"           # output of FIND on <metaDir>/999_mark_executed
 f310Base="310_source_raw.csv"        # raw output of FIND on <sourceDir>
 f320Base="320_backup_raw.csv"        # raw output of FIND on <backupDir>
-f330Base="330_source_clean.csv"      # <sourceDir> file list cleaned (escaped tabs and newlines)
-f340Base="340_backup_clean.csv"      # <backupDir> file list cleaned (escaped tabs and newlines)
-f350Base="350_source_s_hlinks.csv"   # <sourceDir> file list sorted for hardlink detection (inode-deduplication)
-f360Base="360_source_hlinks.csv"     # <sourceDir> file list after hardlink detection (inode-deduplication)
-f370Base="370_union_s_diff.csv"      # <sourceDir> + <backupDir> file lists united and sorted for difference processing
-f380Base="380_diff.csv"              # result of difference processing (target state with actions)
-f390Base="390_diff_r_post.csv"       # difference result reverse sorted for post-processing and splitting off Exec1 actions
+f330Base="330_source_clean.csv"      # <sourceDir> metadata clean (escaped tabs and newlines, field 13 handling)
+f340Base="340_backup_clean.csv"      # <backupDir> metadata clean (escaped tabs and newlines, field 13 handling)
+f350Base="350_source_s_hlinks.csv"   # <sourceDir> metadata sorted for hardlink detection (inode-deduplication)
+f360Base="360_source_hlinks.csv"     # <sourceDir> metadata after hardlink detection (inode-deduplication)
+f370Base="370_union_s_diff.csv"      # <sourceDir> + <backupDir> metadata united and sorted for differences processing
+f380Base="380_diff.csv"              # result of differences processing
+f390Base="390_diff_r_post.csv"       # differences result reverse sorted for post-processing and splitting off Exec1 actions
 
 f405Base="405_select23.awk"          # AWK program for selection of Exec2 and Exec3 actions
 f410Base="410_exec1.awk"             # AWK program for preparation of shellscript for Exec1
@@ -769,8 +769,8 @@ f420Base="420_exec2.awk"             # AWK program for preparation of shellscrip
 f430Base="430_exec3.awk"             # AWK program for preparation of shellscript for Exec3
 f490Base="490_touch.awk"             # AWK program for preparation of shellscript to touch file 999_mark_executed
 
-f500Base="500_target_r.csv"          # target state of synchronized directories reverse sorted
-f505Base="505_target.csv"            # target state of synchronized directories
+f500Base="500_target_r.csv"          # differences result after splitting off Exec1 actions (= target state) reverse sorted
+f505Base="505_target.csv"            # target state (includes Exec2 and Exec3 actions) of synchronized directories
 f510Base="510_exec1.csv"             # Exec1 actions (reverse sorted)
 f520Base="520_exec2.csv"             # Exec2 actions
 f530Base="530_exec3.csv"             # Exec3 actions
@@ -929,6 +929,23 @@ if [ ${help} -eq 1 ]; then
   exit 0
 fi
 
+if [ ${noExec1Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
+  error_exit "Option --noExec1Hdr can be used only together with option --noExec"
+fi
+
+if [ ${noExec2Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
+  error_exit "Option --noExec2Hdr can be used only together with option --noExec"
+fi
+
+if [ ${noExec3Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
+  error_exit "Option --noExec3Hdr can be used only together with option --noExec"
+fi
+
+awkLint=
+if [ ${lTest} -eq 1 ]; then
+  awkLint="-Lfatal"
+fi
+
 ###########################################################
 if [ "" == "${sourceDir}" ]; then
   error_exit "<sourceDir> is mandatory"
@@ -1054,16 +1071,13 @@ metaDirEsc="${metaDir//${TAB}/${TRIPLETT}}"
 metaDirEsc="${metaDirEsc//${NLINE}/${TRIPLETN}}"
 
 ###########################################################
-if [ ${noExec1Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
-  error_exit "Option --noExec1Hdr can be used only together with option --noExec"
-fi
+findLastRunOpsFinalAwk="-path ${TRIPLETDSEP}${f999Base}"
+findSourceOpsFinalAwk="${findGeneralOpsAwk} ${findSourceOpsAwk}"
+findBackupOpsFinalAwk="${findGeneralOpsAwk}"
 
-if [ ${noExec2Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
-  error_exit "Option --noExec2Hdr can be used only together with option --noExec"
-fi
-
-if [ ${noExec3Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
-  error_exit "Option --noExec3Hdr can be used only together with option --noExec"
+if [ ${metaDirDefault} -eq 1 ]; then
+  findSourceOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findSourceOpsFinalAwk}"
+  findBackupOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findBackupOpsFinalAwk}"
 fi
 
 ###########################################################
@@ -1121,7 +1135,6 @@ f999="${metaDir}${f999Base}"
 f300Awk="${metaDirAwk}${f300Base}"
 f310Awk="${metaDirAwk}${f310Base}"
 f320Awk="${metaDirAwk}${f320Base}"
-f500Awk="${metaDirAwk}${f500Base}"
 f510Awk="${metaDirAwk}${f510Base}"
 f520Awk="${metaDirAwk}${f520Base}"
 f530Awk="${metaDirAwk}${f530Base}"
@@ -1132,20 +1145,6 @@ f830Awk="${metaDirAwk}${f830Base}"
 f840Awk="${metaDirAwk}${f840Base}"
 f850Awk="${metaDirAwk}${f850Base}"
 f860Awk="${metaDirAwk}${f860Base}"
-
-findLastRunOpsFinalAwk="-path ${TRIPLETDSEP}${f999Base}"
-findSourceOpsFinalAwk="${findGeneralOpsAwk} ${findSourceOpsAwk}"
-findBackupOpsFinalAwk="${findGeneralOpsAwk}"
-
-if [ ${metaDirDefault} -eq 1 ]; then
-  findSourceOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findSourceOpsFinalAwk}"
-  findBackupOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findBackupOpsFinalAwk}"
-fi
-
-awkLint=
-if [ ${lTest} -eq 1 ]; then
-  awkLint="-Lfatal"
-fi
 
 ###########################################################
 awk ${awkLint} '{ print }' << PARAMFILE > "${f000}"
@@ -1492,7 +1491,7 @@ function add_fragment_to_field( fragment, verbatim ) {
 {
   if (( 1 == fin ) && ( 16 == NF ) && ( TRIPLET == $1 ) && ( TRIPLET == $16 )) {   ## the unproblematic case performance-optimized
     if ( "" != $13 ) {
-      $13 = $13 SLASH
+      $13 = $13 SLASH                                   # if field 13 is not empty, append slash and convert slashes to TRIPLETS
       gsub( SLASHREGEX, TRIPLETS, $13 )
     }
     print
@@ -1740,10 +1739,10 @@ DEFINE_WARNING
 BEGIN {
   FS = FSTAB
   OFS = FSTAB
-  lru = 0     # time of the last run of Zaloha
-  xrn = ""    # occupied namespace for REV.NEW
-  xkp = ""    # occupied namespace for other objects to KEEP on <backupDir>
-  prr = 0     # flag previous record remembered
+  lru = 0   # time of the last run of Zaloha
+  xrn = ""  # occupied namespace for REV.NEW
+  xkp = ""  # occupied namespace for other objects to KEEP on <backupDir>
+  prr = 0   # flag previous record remembered
   sb = ""
 }
 function print_previous( acode ) {
@@ -2009,12 +2008,10 @@ awk ${awkLint} -f "${f100}" << 'AWKPOSTPROC' > "${f190}"
 BEGIN {
   FS = FSTAB
   OFS = FSTAB
-  gsub( TRIPLETBREGEX, BSLASH, f500 )
   gsub( TRIPLETBREGEX, BSLASH, f510 )
-  printf "" > f500
   printf "" > f510
-  lrn = ""       # last file on <backupDir> to REV.NEW
-  lkp = ""       # last other object to KEEP on <backupDir>
+  lrn = ""  # last file on <backupDir> to REV.NEW
+  lkp = ""  # last other object to KEEP on <backupDir>
 }
 function print_split() {
   if ( $2 ~ /^(RMDIR|REMOVE)/ ) {
@@ -2024,7 +2021,7 @@ function print_split() {
     }
     print > f510
   } else {
-    print > f500
+    print
   }
 }
 {
@@ -2048,7 +2045,6 @@ function print_split() {
 }
 END {
   close( f510 )
-  close( f500 )
 }
 AWKPOSTPROC
 
@@ -2064,9 +2060,8 @@ start_progress "Post-processing and splitting off Exec1"
 
 awk ${awkLint}            \
     -f "${f190}"          \
-    -v f500="${f500Awk}"  \
     -v f510="${f510Awk}"  \
-    "${f390}"
+    "${f390}"             > "${f500}"
 
 optim_csv_after_use "${f390}"
 
