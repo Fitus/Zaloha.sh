@@ -142,12 +142,13 @@ Exec2:
 Files and directories which exist only on <sourceDir> are copied to <backupDir>
 (action codes NEW and MKDIR).
 
-If the same file exists on both <sourceDir> and <backupDir>, and the file on
-<sourceDir> is newer, Zaloha "updates" the file on <backupDir> (action code
-UPDATE). If the file on <backupDir> is multiply linked (hardlinked), Zaloha
-removes (unlinks) it first, to prevent updating a multiply linked file,
-which could lead to follow-up effects (action code unl.UP). This unlinking
-can be switched off via the "--noUnlink" option.
+Zaloha "updates" the file on <backupDir> (action code UPDATE) if the same file
+exists on both <sourceDir> and <backupDir> and the comparisons of modification
+time and file size indicate the necessity of this "update". If the file on
+<backupDir> is multiply linked (hardlinked), Zaloha removes (unlinks) it first,
+to prevent "updating" a multiply linked file, which could lead to follow-up
+effects (action code unl.UP). This unlinking can be switched off via the
+"--noUnlink" option.
 
 If the files differ only in attributes (u=user ownership, g=group ownership,
 m=mode), and attribute synchronization is switched on via the "--pUser",
@@ -241,11 +242,11 @@ Briefly, they are:
 Files persist in the metadata directory until the next invocation of Zaloha.
 
 To obtain information about what Zaloha did (counts of removed/copied files,
-total counts, etc), do not parse the screen output, but query the CSV metadata
-files. Query the CSV metadata files after AWKCLEANER. Do not query the raw
-CSV outputs of FIND commands (before AWKCLEANER) and the produced shellscripts,
-because due to eventual newlines in filenames, they may contain multiple lines
-per "record".
+total counts, etc), do not parse the screen output: Query the CSV metadata files
+instead. Query the CSV metadata files after AWKCLEANER. Do not query the raw
+CSV outputs of the FIND commands (before AWKCLEANER) and the produced
+shellscripts, because due to eventual newlines in filenames, they may contain
+multiple lines per "record".
 
 Shellscripts for case of restore
 --------------------------------
@@ -272,10 +273,10 @@ INVOCATION
 Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 
 --sourceDir=<sourceDir> is mandatory. <sourceDir> must exist, otherwise Zaloha
-    throws an error (except the "--noDirChecks" option is given).
+    throws an error (except when the "--noDirChecks" option is given).
 
 --backupDir=<backupDir> is mandatory. <backupDir> must exist, otherwise Zaloha
-    throws an error (except the "--noDirChecks" option is given).
+    throws an error (except when the "--noDirChecks" option is given).
 
 --findSourceOps=<findSourceOps> are additional operands for FIND command that
     searches <sourceDir>. It allows to implement any filtering achievable by
@@ -286,7 +287,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     convention. If an earlier operand in the OR-connected chain evaluates TRUE,
     FIND does not evaluate following operands, leading to no output being
     produced. The main use of <findSourceOps> is to exclude individual files
-    and directories from synchronization:
+    and subdirectories from synchronization:
 
     a) exclude whole subdirectories on <sourceDir> (= don't descend into them):
       -path <subdir path pattern> -prune -o
@@ -304,9 +305,9 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     Although <findSourceOps> consists of multiple words, it is passed in as
     a single string (= enclose it in double-quotes or single-quotes in your
     shell). Zaloha contains a special parser (AWKPARSER) that splits it into
-    separate words (arguments for the FIND command). If a pattern (word) in
+    separate words (arguments for the FIND command). If a word (pattern) in
     <findSourceOps> contains spaces, enclose it in double-quotes. Note: to
-    protect the double-quotes from your shell, use \". If a pattern (word) in
+    protect the double-quotes from your shell, use \". If a word (pattern) in
     <findSourceOps> itself contains a double quote, use \". Note: to protect
     the backslash and the double-quote from your shell, use \\\".
 
@@ -318,12 +319,12 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 
     <findSourceOps> may contain the placeholder ///d/ for <sourceDir> (more
     precisely, <sourceDir> followed by the directory separator and properly
-    escaped, double-quoted and eventually prepended by "./" for use in
-    FIND patterns).
+    escaped for use in FIND patterns).
 
-    Examples: * exclude directory <sourceDir>/.git,
-              * exclude all directories Windows Security
+    Examples: * exclude subdirectory <sourceDir>/.git,
+              * exclude all subdirectories Windows Security
               * exclude all files My "Secret" Things
+
     (double-quoted and single-quoted versions):
 
     --findSourceOps="-path ///d/.git -prune -o"
@@ -337,10 +338,10 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --findGeneralOps=<findGeneralOps> underlies the same rules as <findSourceOps>.
     The key difference is that <findGeneralOps> acts on both <sourceDir> and
     <backupDir>. Hence, generally speaking, it can be used to constrain
-    synchronization to only subsets of files and directories, based on filtering
-    by FIND operands. The main use of <findGeneralOps> is to exclude "Trash"
-    directories from synchronization. <findGeneralOps> has an internally defined
-    default, used to exclude:
+    synchronization to only subsets of files and subdirectories, based on
+    filtering by FIND operands. The main use of <findGeneralOps> is to exclude
+    "Trash" subdirectories from synchronization. <findGeneralOps> has an
+    internally defined default, used to exclude:
 
     <sourceDir or backupDir>/$RECYCLE.BIN
       ... Windows Recycle Bin (assumed to exist directly under <sourceDir> or
@@ -437,7 +438,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
    much quicker. The externally supplied CSV metadata files 310 and/or 320 must
    be placed into the Zaloha metadata directory before invoking Zaloha, and
    these files must, of course, have the same format as the CSV metadata files
-   that would otherwise be produced by the scripts 210 and 220.
+   that would otherwise be produced by the scripts 210 and/or 220.
 
 --noDirChecks   ... switch off the checks for existence of <sourceDir> and
     <backupDir>. This is useful in connection with the options "--metaDir",
@@ -543,7 +544,7 @@ The process which invokes Zaloha in automatic regime should function as follows
 (pseudocode):
 
   run Zaloha.sh --noExec
-  in case of fail: abort process
+  in case of failure: abort process
   perform sanity checks on prepared actions
   if ( sanity checks OK ) then
     execute script 610_exec1.sh
@@ -578,10 +579,6 @@ and <metaDir>. This is relevant especially if <metaDir> is located outside of
 It is possible (but not recommended) for <backupDir> to be a subdirectory of
 <sourceDir> and vice versa. In such cases, conditions to avoid recursive copying
 must be passed in via <findGeneralOps>.
-
-The SORT commands are run under the LC_ALL=C environment variable, to avoid
-problems caused by some locales that ignore slashes and other punctuations
-during sorting.
 
 In some situations (e.g. Linux Samba + Linux Samba client),
 cp --preserve=timestamps does not preserve modification timestamps (unless on
@@ -641,7 +638,7 @@ The cleaned CSV metadata files are then checked by AWKCHECKER for unexpected
 deviations (in which case an error is thrown and the processing stops).
 
 The next (optional) step is to detect hardlinks: the CSV metadata file from
-<sourceDir> is sorted by device number + inode number. This means that
+<sourceDir> will be sorted by device number + inode number. This means that
 multiply-linked files will be in adjacent records. The AWK program AWKHLINKS
 evaluates this situation: The type of the first link will be kept as "file" (f),
 the types of the other links will be changed to "hardlinks" (h).
@@ -692,7 +689,7 @@ For display of filenames on terminal (and only there), control characters (other
 than tabs and newlines) are displayed as ///c, to avoid terminal disruption.
 (Such control characters are still original in the CSV metadata files).
 
-Further, /// are used as first fields in the CSV metadata files, to allow easy
+Further, /// is used as first field in the CSV metadata files, to allow easy
 separation of record lines from continuation lines caused by newlines in
 filenames (it is impossible that continuation lines have /// as the first field,
 because filenames cannot contain the newline + /// sequence).
@@ -713,6 +710,10 @@ and <findGeneralOps>, which may contain the ///d/ placeholder.
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single
 quotes are disruptors. As a solution, the '"'"' quoting technique is used.
+
+The SORT commands are run under the LC_ALL=C environment variable, to avoid
+problems caused by some locales that ignore slashes and other punctuations
+during sorting.
 
 In the CSV metadata files 330 through 500 (i.e. those which undergo the sorts),
 file's paths (field 13) have directory separators (/) appended and all
@@ -842,7 +843,7 @@ LBRACKET="["
 RBRACKETPATTERN="\\]"
 RBRACKET="]"
 CNTRLPATTERN="[[:cntrl:]]"
-TRIPLETDSEP="///d/"  # placeholder for <sourceDir> or <backupDir> followed by directory separator
+TRIPLETDSEP="///d/"  # placeholder in FIND patterns for <sourceDir> or <backupDir> followed by directory separator
 TRIPLETT="///t"      # escape for tab
 TRIPLETN="///n"      # escape for newline
 TRIPLETB="///b"      # escape for backslash
@@ -1483,7 +1484,7 @@ function add_fragment_to_field( fragment, verbatim ) {
   if ( "" != fragment ) {
     fne = 1
   }
-  if (( 13 == fin ) && ( 0 == verbatim )) {             # in field 13, convert slashes to TRIPLETS
+  if (( 13 == fin ) && ( 0 == verbatim )) {             # in field 13, convert slashes to TRIPLETS's
     gsub( SLASHREGEX, TRIPLETS, fragment )
   }
   rec = rec fragment
@@ -1491,7 +1492,7 @@ function add_fragment_to_field( fragment, verbatim ) {
 {
   if (( 1 == fin ) && ( 16 == NF ) && ( TRIPLET == $1 ) && ( TRIPLET == $16 )) {   ## the unproblematic case performance-optimized
     if ( "" != $13 ) {
-      $13 = $13 SLASH                                   # if field 13 is not empty, append slash and convert slashes to TRIPLETS
+      $13 = $13 SLASH                                   # if field 13 is not empty, append slash and convert slashes to TRIPLETS's
       gsub( SLASHREGEX, TRIPLETS, $13 )
     }
     print
@@ -1742,7 +1743,7 @@ BEGIN {
   lru = 0   # time of the last run of Zaloha
   xrn = ""  # occupied namespace for REV.NEW
   xkp = ""  # occupied namespace for other objects to KEEP on <backupDir>
-  prr = 0   # flag previous record remembered
+  prr = 0   # flag previous record remembered (= unprocessed)
   sb = ""
 }
 function print_previous( acode ) {
@@ -1878,8 +1879,8 @@ function process_previous_record() {
           }
         } else if ( "f" == $3 ) {              ## file on <sourceDir>
           if ( "d" == tp ) {                   # file on <sourceDir>, directory on <backupDir>
-            xrn = pt
-            xkp = pt
+            xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
+            xkp = pt                           #  (KEEP impossible down from here due to occupied namespace)
             print_previous( "RMDIR" )
             print_current( "NEW" )
           } else if ( "f" == tp ) {            # file on <sourceDir>, file on <backupDir>
@@ -1888,8 +1889,8 @@ function process_previous_record() {
               if ( "M" $5 == "M" tm ) {
                 oka = 1
               } else {
-                tdi = $5 - tm
-                tda = tdi
+                tdi = $5 - tm                  #  (time difference <sourceDir> file minus <backupDir> file)
+                tda = tdi                      #  (time difference absolute value)
                 if ( tda < 0 ) {
                   tda = - tda
                 }
@@ -1930,7 +1931,7 @@ function process_previous_record() {
           }
         } else {                               ## other object on <sourceDir>
           if ( "d" == tp ) {                   # other object on <sourceDir>, directory on <backupDir>
-            xrn = pt
+            xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
             print_previous( "RMDIR" )
           } else if ( "f" == tp ) {            # other object on <sourceDir>, file on <backupDir>
             remove_file()
@@ -2178,7 +2179,7 @@ BEGIN {
       print "CP='cp --preserve=timestamps'"
     }
     if ( 0 == noUnlink ) {
-      print "RM='rm -f'"
+      print "UNLINK='rm -f'"
     }
     if ( 1 == pUser ) {
       print "CHOWN='chown'"
@@ -2240,7 +2241,7 @@ function apply_attr() {
     copy_file()
     apply_attr()
   } else if ( $2 ~ /^unl\.UP/ ) {
-    print "${RM} " b
+    print "${UNLINK} " b
     copy_file()
     apply_attr()
   } else if ( $2 ~ /^ATTR/ ) {
