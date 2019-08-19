@@ -121,10 +121,11 @@ REV.UP.!  reverse-update file on <sourceDir> which is newer
 
 (internal use, for completion only)
 -----------------------------------
-OK        object without needed action on <sourceDir> (but still to be
-          included in restore scripts)
-KEEP      keep other object on <backupDir> (= do not remove its
-          parent directories)
+OK        object without needed action on <sourceDir> (either files or
+          directories already synchronized with <backupDir>, or other objects
+          not to be synchronized to <backupDir>). These records are necessary
+          for preparation of shellscripts for the case of restore.
+KEEP      object to be kept only on <backupDir>
 
 Exec1:
 ------
@@ -367,6 +368,18 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     commands and try to do as much work as possible, which is a behavior
     different from the interactive regime, where scripts are traced and halt
     on the first error.
+
+--noRemove      ... do not remove files and directories which exist only
+    on <backupDir>. This option is useful in situations like that <sourceDir>
+    holds only "current" files but <backupDir> should hold "current" plus
+    "historical" files.
+
+    Please keep in mind that if objects of conflicting types on <backupDir>
+    prevent synchronization (e.g. a file cannot overwrite a directory),
+    removals are unavoidable and will be prepared regardless of this option.
+    In such case Zaloha displays a warning message in the interactive regime.
+    In automatic operations, the calling process should query the CSV metadata
+    file 510 to detect this case.
 
 --revNew        ... enable REV.NEW (= if standalone file on <backupDir> is
                     newer than the last run of Zaloha, reverse-copy it
@@ -653,8 +666,8 @@ directories with actions to reach that target state.
 
 The output of AWKDIFF is then sorted by filename in reverse order (so that
 parent directories come after their children) and post-processed by AWKPOSTPROC.
-AWKPOSTPROC modifies actions on parent directories of files to REV.NEW and other
-objects to KEEP on <backupDir>.
+AWKPOSTPROC modifies actions on parent directories of files to REV.NEW and
+objects to KEEP only on <backupDir>.
 
 The remaining code uses the produced data to perform actual work, and should be
 self-explanatory.
@@ -862,6 +875,7 @@ backupDir=
 findSourceOps=
 findGeneralOps=
 noExec=0
+noRemove=0
 revNew=0
 revUp=0
 hLinks=0
@@ -896,6 +910,7 @@ do
     --findSourceOps=*)   findSourceOps="${tmpVal#*=}";    shift ;;
     --findGeneralOps=*)  findGeneralOps="M${tmpVal#*=}";  shift ;;
     --noExec)            noExec=1 ;                       shift ;;
+    --noRemove)          noRemove=1 ;                     shift ;;
     --revNew)            revNew=1 ;                       shift ;;
     --revUp)             revUp=1 ;                        shift ;;
     --hLinks)            hLinks=1 ;                       shift ;;
@@ -949,7 +964,7 @@ fi
 
 ###########################################################
 if [ "" == "${sourceDir}" ]; then
-  error_exit "<sourceDir> is mandatory"
+  error_exit "<sourceDir> is mandatory, get help via Zaloha.sh --help"
 fi
 if [ "${sourceDir/${TRIPLET}/}" != "${sourceDir}" ]; then
   error_exit "<sourceDir> contains the directory separator triplet (${TRIPLET})"
@@ -981,7 +996,7 @@ fi
 
 ###########################################################
 if [ "" == "${backupDir}" ]; then
-  error_exit "<backupDir> is mandatory"
+  error_exit "<backupDir> is mandatory, get help via Zaloha.sh --help"
 fi
 if [ "${backupDir/${TRIPLET}/}" != "${backupDir}" ]; then
   error_exit "<backupDir> contains the directory separator triplet (${TRIPLET})"
@@ -1166,6 +1181,7 @@ ${TRIPLET}${FSTAB}findGeneralOps${FSTAB}${findGeneralOps}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findGeneralOpsAwk${FSTAB}${findGeneralOpsAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findGeneralOpsEsc${FSTAB}${findGeneralOpsEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec${FSTAB}${noExec}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noRemove${FSTAB}${noRemove}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}revNew${FSTAB}${revNew}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}revUp${FSTAB}${revUp}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}hLinks${FSTAB}${hLinks}${FSTAB}${TRIPLET}
@@ -1681,24 +1697,24 @@ BEGIN {
     if ( md != $12 ) {
       error_exit( "Unexpected falsely detected hardlink (mode differs)" )
     }
-    $3 = "h"  # hardlink
-    $15 = pt  # object of hardlink
+    $3 = "h"    # hardlink
+    $15 = pt    # object of hardlink
     if ( "" != $15 ) {
       gsub( TRIPLETSREGEX, SLASH, $15 )
       $15 = substr( $15, 1, length( $15 ) - 1 )
     }
   } else {
-    hcn = 1   # detected hardlink count
-    tp = $3   # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
-    sz = $4   # previous record's column  4: file's size in bytes
-    tm = $5   # previous record's column  5: file's last modification time, seconds since 01/01/1970
-    dv = $7   # previous record's column  7: device number the file is on
-    id = $8   # previous record's column  8: file's inode number
-    nh = $9   # previous record's column  9: number of hardlinks to file
-    us = $10  # previous record's column 10: file's user name
-    gr = $11  # previous record's column 11: file's group name
-    md = $12  # previous record's column 12: file's permission bits (in octal)
-    pt = $13  # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
+    hcn = 1     # detected hardlink count
+    tp = $3     # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+    sz = $4     # previous record's column  4: file's size in bytes
+    tm = $5     # previous record's column  5: file's last modification time, seconds since 01/01/1970
+    dv = $7     # previous record's column  7: device number the file is on
+    id = $8     # previous record's column  8: file's inode number
+    nh = $9     # previous record's column  9: number of hardlinks to file
+    us = $10    # previous record's column 10: file's user name
+    gr = $11    # previous record's column 11: file's group name
+    md = $12    # previous record's column 12: file's permission bits (in octal)
+    pt = $13    # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
   }
   print
 }
@@ -1740,10 +1756,10 @@ DEFINE_WARNING
 BEGIN {
   FS = FSTAB
   OFS = FSTAB
-  lru = 0   # time of the last run of Zaloha
-  xrn = ""  # occupied namespace for REV.NEW
-  xkp = ""  # occupied namespace for other objects to KEEP on <backupDir>
-  prr = 0   # flag previous record remembered (= unprocessed)
+  lru = 0     # time of the last run of Zaloha
+  xrn = ""    # occupied namespace for REV.NEW
+  xkp = ""    # occupied namespace for objects to KEEP only on <backupDir>
+  prr = 0     # flag previous record remembered (= unprocessed)
   sb = ""
 }
 function print_previous( acode ) {
@@ -1752,11 +1768,27 @@ function print_previous( acode ) {
 function print_current( acode ) {
   print TRIPLET, acode, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, TRIPLET, $15, TRIPLET
 }
-function remove_file() {
-  if (( 0 != lru ) && ( lru < tm )) {
-    print_previous( "REMOVE.!" )
+function remove() {
+  if ( "d" == tp ) {
+    print_previous( "RMDIR" )
+  } else if ( "f" == tp ) {
+    if (( 0 != lru ) && ( lru < tm )) {
+      print_previous( "REMOVE.!" )
+    } else {
+      print_previous( "REMOVE" )
+    }
   } else {
-    print_previous( "REMOVE" )
+    print_previous( "REMOVE." tp )
+  }
+}
+function try_to_keep_or_remove() {
+  if ( "" == xkp ) {
+    print_previous( "KEEP" )
+  } else if ( 1 == index( pt, xkp )) {
+    remove()                                   #  (unavoidable removal)
+  } else {
+    print_previous( "KEEP" )
+    xkp = ""
   }
 }
 function update_file() {
@@ -1826,29 +1858,32 @@ function process_previous_record() {
     }
   } else {
     if ( "d" == tp ) {                         # directory only on <backupDir>
-      print_previous( "RMDIR" )
+      if ( 1 == noRemove ) {
+        try_to_keep_or_remove()
+      } else {
+        remove()
+      }
     } else if ( "f" == tp ) {                  # file only on <backupDir>
       if (( 1 == revNew ) && ( 0 != lru ) && ( lru < tm )) {
         if ( "" == xrn ) {
           print_previous( "REV.NEW" )
         } else if ( 1 == index( pt, xrn )) {
-          print_previous( "REMOVE.!" )
+          if ( 1 == noRemove ) {
+            try_to_keep_or_remove()
+          } else {
+            remove()
+          }
         } else {
           print_previous( "REV.NEW" )
           xrn = ""
         }
+      } else if ( 1 == noRemove ) {
+        try_to_keep_or_remove()
       } else {
-        remove_file()
+        remove()
       }
     } else {                                   # other object only on <backupDir>
-      if ( "" == xkp ) {
-        print_previous( "KEEP" )
-      } else if ( 1 == index( pt, xkp )) {
-        print_previous( "REMOVE." tp )
-      } else {
-        print_previous( "KEEP" )
-        xkp = ""
-      }
+      try_to_keep_or_remove()
     }
   }
 }
@@ -1870,18 +1905,15 @@ function process_previous_record() {
         if ( "d" == $3 ) {                     ## directory on <sourceDir>
           if ( "d" == tp ) {                   # directory on <sourceDir>, directory on <backupDir>
             attributes_or_ok()
-          } else if ( "f" == tp ) {            # directory on <sourceDir>, file on <backupDir>
-            remove_file()
-            print_current( "MKDIR" )
-          } else {                             # directory on <sourceDir>, other object on <backupDir>
-            print_previous( "REMOVE." tp )
+          } else {                             # directory on <sourceDir>, file or other object on <backupDir>
+            remove()                           #  (unavoidable removal)
             print_current( "MKDIR" )
           }
         } else if ( "f" == $3 ) {              ## file on <sourceDir>
           if ( "d" == tp ) {                   # file on <sourceDir>, directory on <backupDir>
             xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
             xkp = pt                           #  (KEEP impossible down from here due to occupied namespace)
-            print_previous( "RMDIR" )
+            remove()                           #  (unavoidable removal)
             print_current( "NEW" )
           } else if ( "f" == tp ) {            # file on <sourceDir>, file on <backupDir>
             oka = 0
@@ -1926,15 +1958,23 @@ function process_previous_record() {
               }
             }
           } else {                             # file on <sourceDir>, other object on <backupDir>
-            print_previous( "REMOVE." tp )
+            remove()                           #  (unavoidable removal)
             print_current( "NEW" )
           }
         } else {                               ## other object on <sourceDir>
           if ( "d" == tp ) {                   # other object on <sourceDir>, directory on <backupDir>
             xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
-            print_previous( "RMDIR" )
+            if ( 1 == noRemove ) {
+              print_previous( "KEEP" )
+            } else {
+              remove()
+            }
           } else if ( "f" == tp ) {            # other object on <sourceDir>, file on <backupDir>
-            remove_file()
+            if ( 1 == noRemove ) {
+              print_previous( "KEEP" )
+            } else {
+              remove()
+            }
           } else {                             # other object on <sourceDir>, other object on <backupDir>
             print_previous( "KEEP" )
           }
@@ -1953,19 +1993,19 @@ function process_previous_record() {
       prr = 1
     }
   }
-  sb = $2   # previous record's column  2: S = <sourceDir>, B = <backupDir>, L = last run record
-  tp = $3   # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
-  sz = $4   # previous record's column  4: file's size in bytes
-  tm = $5   # previous record's column  5: file's last modification time, seconds since 01/01/1970
-  ft = $6   # previous record's column  6: type of the filesystem the file is on
-  dv = $7   # previous record's column  7: device number the file is on
-  id = $8   # previous record's column  8: file's inode number
-  nh = $9   # previous record's column  9: number of hardlinks to file
-  us = $10  # previous record's column 10: file's user name
-  gr = $11  # previous record's column 11: file's group name
-  md = $12  # previous record's column 12: file's permission bits (in octal)
-  pt = $13  # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
-  ol = $15  # previous record's column 15: object of symbolic link
+  sb = $2     # previous record's column  2: S = <sourceDir>, B = <backupDir>, L = last run record
+  tp = $3     # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+  sz = $4     # previous record's column  4: file's size in bytes
+  tm = $5     # previous record's column  5: file's last modification time, seconds since 01/01/1970
+  ft = $6     # previous record's column  6: type of the filesystem the file is on
+  dv = $7     # previous record's column  7: device number the file is on
+  id = $8     # previous record's column  8: file's inode number
+  nh = $9     # previous record's column  9: number of hardlinks to file
+  us = $10    # previous record's column 10: file's user name
+  gr = $11    # previous record's column 11: file's group name
+  md = $12    # previous record's column 12: file's permission bits (in octal)
+  pt = $13    # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
+  ol = $15    # previous record's column 15: object of symbolic link
 }
 END {
   if ( 1 == prr ) {
@@ -1991,6 +2031,7 @@ start_progress "Differences processing"
 
 awk ${awkLint}               \
     -f "${f170}"             \
+    -v noRemove=${noRemove}  \
     -v revNew=${revNew}      \
     -v revUp=${revUp}        \
     -v ok3600s=${ok3600s}    \
@@ -2011,10 +2052,26 @@ BEGIN {
   OFS = FSTAB
   gsub( TRIPLETBREGEX, BSLASH, f510 )
   printf "" > f510
-  lrn = ""  # last file on <backupDir> to REV.NEW
-  lkp = ""  # last other object to KEEP on <backupDir>
+  lrn = ""    # path of last file to REV.NEW
+  lkp = ""    # path of last object to KEEP only on <backupDir>
 }
-function print_split() {
+{
+  if ( $2 ~ /^REV\.NEW/ ) {
+    lrn = $13             # remember path of last file to REV.NEW
+  } else if ( $2 ~ /^KEEP/ ) {
+    if ( 1 == index( lrn, $13 )) {
+      $2 = "REV.MKDI"     # convert KEEP to REV.MKDI on parent directory of a file to REV.NEW
+    } else {
+      lkp = $13           # remember path of last object to KEEP only on <backupDir>
+    }
+  } else if ( $2 ~ /^RMDIR/ ) {
+    if ( 1 == index( lrn, $13 )) {
+      $2 = "REV.MKDI"     # convert RMDIR to REV.MKDI on parent directory of a file to REV.NEW
+    } else if ( 1 == index( lkp, $13 )) {
+      $2 = "KEEP"         # convert RMDIR to KEEP on parent directory of an object to KEEP only on <backupDir>
+    }
+  }
+  # modifications done, split off 510 data, output remaining data
   if ( $2 ~ /^(RMDIR|REMOVE)/ ) {
     if ( "" != $13 ) {
       gsub( TRIPLETSREGEX, SLASH, $13 )
@@ -2025,25 +2082,6 @@ function print_split() {
     print
   }
 }
-{
-  if ( $2 ~ /^REV\.NEW/ ) {
-    lrn = $13             # remember path, output REV.NEW
-    print_split()
-  } else if ( $2 ~ /^KEEP/ ) {
-    lkp = $13             # just remember path, do not output KEEP
-  } else if ( $2 ~ /^RMDIR/ ) {
-    if ( 1 == index( lrn, $13 )) {
-      $2 = "REV.MKDI"     # convert RMDIR to REV.MKDI on parent directory of a file to REV.NEW
-      print_split()
-    } else if ( 1 == index( lkp, $13 )) {
-      # no action         # cancel RMDIR on parent directory of other object to KEEP on <backupDir>
-    } else {
-      print_split()
-    }
-  } else {
-    print_split()
-  }
-}
 END {
   close( f510 )
 }
@@ -2051,7 +2089,7 @@ AWKPOSTPROC
 
 start_progress "Sorting (3)"
 
-LC_ALL=C sort -t "${FSTAB}" -k13r,13 "${f380}" > "${f390}"
+LC_ALL=C sort -t "${FSTAB}" -k13r,13 -k2,2 "${f380}" > "${f390}"
 
 optim_csv_after_use "${f380}"
 
@@ -2098,7 +2136,7 @@ AWKSELECT23
 
 start_progress "Sorting (4) and selecting Exec2 and Exec3"
 
-LC_ALL=C sort -t "${FSTAB}" -k13,13 "${f500}" | awk ${awkLint} \
+LC_ALL=C sort -t "${FSTAB}" -k13,13 -k2,2 "${f500}" | awk ${awkLint} \
     -f "${f405}"          \
     -v f520="${f520Awk}"  \
     -v f530="${f530Awk}"  > "${f505}"
@@ -2496,47 +2534,49 @@ BEGIN {
   SECTION_LINE > f860
 }
 {
-  us = $10
-  gr = $11
-  md = $12
-  pt = $13
-  ol = $15
-  gsub( QUOTEREGEX, QUOTEESC, us )
-  gsub( QUOTEREGEX, QUOTEESC, gr )
-  gsub( QUOTEREGEX, QUOTEESC, pt )
-  gsub( QUOTEREGEX, QUOTEESC, ol )
-  gsub( TRIPLETNREGEX, NLINE, pt )
-  gsub( TRIPLETNREGEX, NLINE, ol )
-  gsub( TRIPLETTREGEX, TAB, pt )
-  gsub( TRIPLETTREGEX, TAB, ol )
-  u = "'" us "'"
-  g = "'" gr "'"
-  m = "'" md "'"
-  b = "\"${backupDir}\"'" pt "'"
-  r = "\"${restoreDir}\"'" pt "'"
-  o = "\"${restoreDir}\"'" ol "'"
-  if ( "d" == $3 ) {
-    print "${MKDIR} " r > f800
-    print "${CHOWN} " u " " r > f840
-    print "${CHGRP} " g " " r > f850
-    print "${CHMOD} " m " " r > f860
-  } else if ( "f" == $3 ) {
-    print "${CP" pin "} " b " " r > f810
-    print "${TOUCH" pin "} " b " " r > f810
-    print "${CHOWN} " u " " r > f840
-    print "${CHGRP} " g " " r > f850
-    print "${CHMOD} " m " " r > f860
-    if ( 8 <= pin ) {
-      pin = 1
-    } else {
-      pin = pin + 1
+  if ( $2 !~ /^KEEP/ ) {
+    us = $10
+    gr = $11
+    md = $12
+    pt = $13
+    ol = $15
+    gsub( QUOTEREGEX, QUOTEESC, us )
+    gsub( QUOTEREGEX, QUOTEESC, gr )
+    gsub( QUOTEREGEX, QUOTEESC, pt )
+    gsub( QUOTEREGEX, QUOTEESC, ol )
+    gsub( TRIPLETNREGEX, NLINE, pt )
+    gsub( TRIPLETNREGEX, NLINE, ol )
+    gsub( TRIPLETTREGEX, TAB, pt )
+    gsub( TRIPLETTREGEX, TAB, ol )
+    u = "'" us "'"
+    g = "'" gr "'"
+    m = "'" md "'"
+    b = "\"${backupDir}\"'" pt "'"
+    r = "\"${restoreDir}\"'" pt "'"
+    o = "\"${restoreDir}\"'" ol "'"
+    if ( "d" == $3 ) {
+      print "${MKDIR} " r > f800
+      print "${CHOWN} " u " " r > f840
+      print "${CHGRP} " g " " r > f850
+      print "${CHMOD} " m " " r > f860
+    } else if ( "f" == $3 ) {
+      print "${CP" pin "} " b " " r > f810
+      print "${TOUCH" pin "} " b " " r > f810
+      print "${CHOWN} " u " " r > f840
+      print "${CHGRP} " g " " r > f850
+      print "${CHMOD} " m " " r > f860
+      if ( 8 <= pin ) {
+        pin = 1
+      } else {
+        pin = pin + 1
+      }
+    } else if ( "l" == $3 ) {
+      print "${LNSYMB} '" ol "' " r > f820
+      print "${CHOWN} " u " " r > f840
+      print "${CHGRP} " g " " r > f850
+    } else if ( "h" == $3 ) {
+      print "${LNHARD} " o " " r > f830
     }
-  } else if ( "l" == $3 ) {
-    print "${LNSYMB} '" ol "' " r > f820
-    print "${CHOWN} " u " " r > f840
-    print "${CHGRP} " g " " r > f850
-  } else if ( "h" == $3 ) {
-    print "${LNHARD} " o " " r > f830
   }
 }
 END {
@@ -2601,6 +2641,10 @@ echo "==========================================="
 awk ${awkLint} -f "${f104}" -v color=${color} "${f510}"
 
 if [ -s "${f510}" ]; then
+  if [ ${noRemove} -eq 1 ]; then
+    echo
+    echo "WARNING: Unavoidable removals prepared regardless of the --noRemove option"
+  fi
   echo
   read -p "Execute above listed removals from ${backupDirTerm} ? [Y/y=Yes, other=do nothing and abort]: " tmpVal
   if [ "Y" == "${tmpVal/y/Y}" ]; then
