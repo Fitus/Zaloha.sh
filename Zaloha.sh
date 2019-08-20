@@ -904,38 +904,38 @@ help=0
 
 for tmpVal in "${@}"
 do
-  case ${tmpVal} in
-    --sourceDir=*)       sourceDir="${tmpVal#*=}";        shift ;;
-    --backupDir=*)       backupDir="${tmpVal#*=}";        shift ;;
-    --findSourceOps=*)   findSourceOps="${tmpVal#*=}";    shift ;;
-    --findGeneralOps=*)  findGeneralOps="M${tmpVal#*=}";  shift ;;
-    --noExec)            noExec=1 ;                       shift ;;
-    --noRemove)          noRemove=1 ;                     shift ;;
-    --revNew)            revNew=1 ;                       shift ;;
-    --revUp)             revUp=1 ;                        shift ;;
-    --hLinks)            hLinks=1 ;                       shift ;;
-    --ok3600s)           ok3600s=1 ;                      shift ;;
-    --noUnlink)          noUnlink=1 ;                     shift ;;
-    --touch)             touch=1 ;                        shift ;;
-    --pUser)             pUser=1 ;                        shift ;;
-    --pGroup)            pGroup=1 ;                       shift ;;
-    --pMode)             pMode=1 ;                        shift ;;
-    --pRevUser)          pRevUser=1 ;                     shift ;;
-    --pRevGroup)         pRevGroup=1 ;                    shift ;;
-    --pRevMode)          pRevMode=1 ;                     shift ;;
-    --noRestore)         noRestore=1 ;                    shift ;;
-    --optimCSV)          optimCSV=1 ;                     shift ;;
-    --metaDir=*)         metaDir="M${tmpVal#*=}";         shift ;;
-    --noFindSource)      noFindSource=1 ;                 shift ;;
-    --noFindBackup)      noFindBackup=1 ;                 shift ;;
-    --noDirChecks)       noDirChecks=1 ;                  shift ;;
-    --noExec1Hdr)        noExec1Hdr=1 ;                   shift ;;
-    --noExec2Hdr)        noExec2Hdr=1 ;                   shift ;;
-    --noExec3Hdr)        noExec3Hdr=1 ;                   shift ;;
-    --noProgress)        noProgress=1 ;                   shift ;;
-    --color)             color=1 ;                        shift ;;
-    --lTest)             lTest=1 ;                        shift ;;
-    --help)              help=1 ;                         shift ;;
+  case "${tmpVal}" in
+    --sourceDir=*)       sourceDir="${tmpVal#*=}" ;;
+    --backupDir=*)       backupDir="${tmpVal#*=}" ;;
+    --findSourceOps=*)   findSourceOps="${tmpVal#*=}" ;;
+    --findGeneralOps=*)  findGeneralOps="M${tmpVal#*=}" ;;
+    --noExec)            noExec=1 ;;
+    --noRemove)          noRemove=1 ;;
+    --revNew)            revNew=1 ;;
+    --revUp)             revUp=1 ;;
+    --hLinks)            hLinks=1 ;;
+    --ok3600s)           ok3600s=1 ;;
+    --noUnlink)          noUnlink=1 ;;
+    --touch)             touch=1 ;;
+    --pUser)             pUser=1 ;;
+    --pGroup)            pGroup=1 ;;
+    --pMode)             pMode=1 ;;
+    --pRevUser)          pRevUser=1 ;;
+    --pRevGroup)         pRevGroup=1 ;;
+    --pRevMode)          pRevMode=1 ;;
+    --noRestore)         noRestore=1 ;;
+    --optimCSV)          optimCSV=1 ;;
+    --metaDir=*)         metaDir="M${tmpVal#*=}" ;;
+    --noFindSource)      noFindSource=1 ;;
+    --noFindBackup)      noFindBackup=1 ;;
+    --noDirChecks)       noDirChecks=1 ;;
+    --noExec1Hdr)        noExec1Hdr=1 ;;
+    --noExec2Hdr)        noExec2Hdr=1 ;;
+    --noExec3Hdr)        noExec3Hdr=1 ;;
+    --noProgress)        noProgress=1 ;;
+    --color)             color=1 ;;
+    --lTest)             lTest=1 ;;
+    --help)              help=1 ;;
     *) error_exit "Unknown option ${tmpVal}, get help via Zaloha.sh --help" ;;
   esac
 done
