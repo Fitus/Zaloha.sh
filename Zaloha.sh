@@ -190,6 +190,11 @@ sockets, special devices, etc). These objects are considered to be part of the
 operating system or parts of applications, and dedicated scripts for their
 (re-)creation should exist.
 
+It was a conscious decision to synchronize to <backupDir> only files and
+directories and keep other objects in metadata only. This gives more freedom
+in the choice of filesystem type for <backupDir>, because every filesystem type
+is able to store files and directories, but not necessarily the other objects.
+
 Exec3:
 ------
 This step is optional and can be activated via the "--revNew" and "--revUp"
@@ -672,6 +677,49 @@ objects to KEEP only on <backupDir>.
 The remaining code uses the produced data to perform actual work, and should be
 self-explanatory.
 
+Understanding AWKDIFF is the key to understanding of whole Zaloha. An important
+hint to AWKDIFF is that it distinguishes three types of filesystem objects:
+directories, files and other objects. At any given path, each of the three types
+on <sourceDir> can meet each of the three types on <backupDir>. This gives a
+3x3 matrix. Additionally, an object can be standalone on <sourceDir>, giving
+further 3 cases, and standalone on <backupDir>, giving the last 3 cases.
+Also, mathematically, there are 3x3 + 3 + 3 = 15 cases to be handled by AWKDIFF.
+The AWKDIFF code is commented on key places to make orientation easier.
+A good case to begin with is case 5 (file on <sourceDir>, file on <backupDir>),
+as this is the most important (and complex) case.
+
+If you are a database developer, you can think of the CSV metadata files as
+tables, and Zaloha as a program that operates on these tables: It fills them
+with data obtained from the filesystems (via FIND), then processes the data
+(defined sequence of sorts, sequential processings, unions and selects), then
+converts the data to shellscripts, and finally executes the shellscripts
+to apply the required changes back to the filesystems.
+
+Among the operations which Zaloha performs, there is no operation which would
+require the CSV metadata to fit as a whole into memory. This means that the size
+of memory does not constrain Zaloha on how big "tasks" it can handle.
+The critical operations from this perspective are the sorts. However,
+GNU sort, for instance, is able to intelligently switch to an external
+sort-merge algorithm, if it determines that the data is "too big",
+thus mitigating this concern.
+
+Talking further in database developer's language: The data model of all CSV
+metadata files is the same and is described in form of comments in AWKPARSER.
+Files 310 and 320 do not qualify as tables, as their fields and records are
+broken by eventual tabs and newlines in filenames. In files 330 through 370,
+field 2 is the Source/Backup indicator. In files 380 through 530, field 2 is
+the Action Code.
+
+The natural primary key in files 330 through 360 is the file's path (column 13).
+In files 370 through 505, the natural primary key is combined column 13 with
+column 2. In files 510 through 530, the natural primary key is again
+column 13 alone.
+
+The combined primary key in file 505 is obvious e.g. in the case of other object
+on <sourceDir> and other object on <backupDir>: File 505 then contains an
+OK record for the former and a KEEP record for the latter, both with the same
+file's path (column 13).
+
 ###########################################################
 
 TECHNIQUES FOR HANDLING OF WEIRD CHARACTERS IN FILENAMES
@@ -948,11 +996,9 @@ fi
 if [ ${noExec1Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
   error_exit "Option --noExec1Hdr can be used only together with option --noExec"
 fi
-
 if [ ${noExec2Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
   error_exit "Option --noExec2Hdr can be used only together with option --noExec"
 fi
-
 if [ ${noExec3Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
   error_exit "Option --noExec3Hdr can be used only together with option --noExec"
 fi
@@ -1386,22 +1432,22 @@ BEGIN {
     error_exit( "<findOps> contains unpaired double quote" )
   }
   cmd = cmd " -printf '"
-  cmd = cmd TRIPLET           # column  1: leading field
-  cmd = cmd "\\t" srcBackup   # column  2: S = <sourceDir>, B = <backupDir>, L = last run record
-  cmd = cmd "\\t%y"           # column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
-  cmd = cmd "\\t%s"           # column  4: file's size in bytes
-  cmd = cmd "\\t%Ts"          # column  5: file's last modification time, seconds since 01/01/1970
-  cmd = cmd "\\t%F"           # column  6: type of the filesystem the file is on
-  cmd = cmd "\\t%D"           # column  7: device number the file is on
-  cmd = cmd "\\t%i"           # column  8: file's inode number
-  cmd = cmd "\\t%n"           # column  9: number of hardlinks to file
-  cmd = cmd "\\t%u"           # column 10: file's user name
-  cmd = cmd "\\t%g"           # column 11: file's group name
-  cmd = cmd "\\t%m"           # column 12: file's permission bits (in octal)
-  cmd = cmd "\\t%P"           # column 13: file's path with <sourceDir> or <backupDir> stripped
-  cmd = cmd "\\t" TRIPLET     # column 14: terminator field
-  cmd = cmd "\\t%l"           # column 15: object of symbolic link
-  cmd = cmd "\\t" TRIPLET     # column 16: terminator field
+  cmd = cmd TRIPLET             # column  1: leading field
+  cmd = cmd "\\t" sourceBackup  # column  2: S = <sourceDir>, B = <backupDir>, L = last run record
+  cmd = cmd "\\t%y"             # column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+  cmd = cmd "\\t%s"             # column  4: file's size in bytes
+  cmd = cmd "\\t%Ts"            # column  5: file's last modification time, seconds since 01/01/1970
+  cmd = cmd "\\t%F"             # column  6: type of the filesystem the file is on
+  cmd = cmd "\\t%D"             # column  7: device number the file is on
+  cmd = cmd "\\t%i"             # column  8: file's inode number
+  cmd = cmd "\\t%n"             # column  9: number of hardlinks to file
+  cmd = cmd "\\t%u"             # column 10: file's user name
+  cmd = cmd "\\t%g"             # column 11: file's group name
+  cmd = cmd "\\t%m"             # column 12: file's permission bits (in octal)
+  cmd = cmd "\\t%P"             # column 13: file's path with <sourceDir> or <backupDir> stripped
+  cmd = cmd "\\t" TRIPLET       # column 14: terminator field
+  cmd = cmd "\\t%l"             # column 15: object of symbolic link
+  cmd = cmd "\\t" TRIPLET       # column 16: terminator field
   cmd = cmd "\\n' > '" outFile "'"
   BIN_BASH
   print "BASH_XTRACEFD=1"
@@ -1424,7 +1470,7 @@ start_progress "Parsing"
 
 awk ${awkLint}                              \
     -f "${f106}"                            \
-    -v srcBackup="L"                        \
+    -v sourceBackup="L"                     \
     -v findDir="${metaDirAwk}"              \
     -v findOps="${findLastRunOpsFinalAwk}"  \
     -v tripletDSepV="${metaDirPattAwk}"     \
@@ -1433,7 +1479,7 @@ awk ${awkLint}                              \
 
 awk ${awkLint}                              \
     -f "${f106}"                            \
-    -v srcBackup="S"                        \
+    -v sourceBackup="S"                     \
     -v findDir="${sourceDirAwk}"            \
     -v findOps="${findSourceOpsFinalAwk}"   \
     -v tripletDSepV="${sourceDirPattAwk}"   \
@@ -1442,7 +1488,7 @@ awk ${awkLint}                              \
 
 awk ${awkLint}                              \
     -f "${f106}"                            \
-    -v srcBackup="B"                        \
+    -v sourceBackup="B"                     \
     -v findDir="${backupDirAwk}"            \
     -v findOps="${findBackupOpsFinalAwk}"   \
     -v tripletDSepV="${backupDirPattAwk}"   \
@@ -1847,23 +1893,21 @@ function attributes_or_ok() {
 }
 function process_previous_record() {
   if ( "S" == sb ) {
-    if ( "d" == tp ) {                         # directory only on <sourceDir>
+    if ( "d" == tp ) {                         # directory only on <sourceDir> (case 10)
       print_previous( "MKDIR" )
-    } else if ( "f" == tp ) {                  # file only on <sourceDir>
+    } else if ( "f" == tp ) {                  # file only on <sourceDir> (case 11)
       print_previous( "NEW" )
-    } else if ( "l" == tp ) {                  # symbolic link only on <sourceDir> (record needed for the restore scripts)
-      print_previous( "OK" )
-    } else if ( "h" == tp ) {                  # hardlink only on <sourceDir> (record needed for the restore scripts)
-      print_previous( "OK" )
+    } else {                                   # other object only on <sourceDir> (case 12)
+      print_previous( "OK" )                   #  (OK record needed for the restore scripts)
     }
   } else {
-    if ( "d" == tp ) {                         # directory only on <backupDir>
+    if ( "d" == tp ) {                         # directory only on <backupDir> (case 13)
       if ( 1 == noRemove ) {
         try_to_keep_or_remove()
       } else {
         remove()
       }
-    } else if ( "f" == tp ) {                  # file only on <backupDir>
+    } else if ( "f" == tp ) {                  # file only on <backupDir> (case 14)
       if (( 1 == revNew ) && ( 0 != lru ) && ( lru < tm )) {
         if ( "" == xrn ) {
           print_previous( "REV.NEW" )
@@ -1882,7 +1926,7 @@ function process_previous_record() {
       } else {
         remove()
       }
-    } else {                                   # other object only on <backupDir>
+    } else {                                   # other object only on <backupDir> (case 15)
       try_to_keep_or_remove()
     }
   }
@@ -1903,19 +1947,19 @@ function process_previous_record() {
     if ( 1 == prr ) {
       if ( pt == $13 ) {                       ### same name on <sourceDir> and <backupDir>
         if ( "d" == $3 ) {                     ## directory on <sourceDir>
-          if ( "d" == tp ) {                   # directory on <sourceDir>, directory on <backupDir>
+          if ( "d" == tp ) {                   # directory on <sourceDir>, directory on <backupDir> (case 1)
             attributes_or_ok()
-          } else {                             # directory on <sourceDir>, file or other object on <backupDir>
+          } else {                             # directory on <sourceDir>, file or other object on <backupDir> (cases 2,3)
             remove()                           #  (unavoidable removal)
             print_current( "MKDIR" )
           }
         } else if ( "f" == $3 ) {              ## file on <sourceDir>
-          if ( "d" == tp ) {                   # file on <sourceDir>, directory on <backupDir>
+          if ( "d" == tp ) {                   # file on <sourceDir>, directory on <backupDir> (case 4)
             xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
             xkp = pt                           #  (KEEP impossible down from here due to occupied namespace)
             remove()                           #  (unavoidable removal)
             print_current( "NEW" )
-          } else if ( "f" == tp ) {            # file on <sourceDir>, file on <backupDir>
+          } else if ( "f" == tp ) {            # file on <sourceDir>, file on <backupDir> (case 5)
             oka = 0
             if ( "M" $4 == "M" sz ) {
               if ( "M" $5 == "M" tm ) {
@@ -1957,32 +2001,28 @@ function process_previous_record() {
                 update_file()
               }
             }
-          } else {                             # file on <sourceDir>, other object on <backupDir>
+          } else {                             # file on <sourceDir>, other object on <backupDir> (case 6)
             remove()                           #  (unavoidable removal)
             print_current( "NEW" )
           }
         } else {                               ## other object on <sourceDir>
-          if ( "d" == tp ) {                   # other object on <sourceDir>, directory on <backupDir>
+          if ( "d" == tp ) {                   # other object on <sourceDir>, directory on <backupDir> (case 7)
             xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
             if ( 1 == noRemove ) {
               print_previous( "KEEP" )
             } else {
               remove()
             }
-          } else if ( "f" == tp ) {            # other object on <sourceDir>, file on <backupDir>
+          } else if ( "f" == tp ) {            # other object on <sourceDir>, file on <backupDir> (case 8)
             if ( 1 == noRemove ) {
               print_previous( "KEEP" )
             } else {
               remove()
             }
-          } else {                             # other object on <sourceDir>, other object on <backupDir>
+          } else {                             # other object on <sourceDir>, other object on <backupDir> (case 9)
             print_previous( "KEEP" )
           }
-          if ( "l" == $3 ) {                   # symbolic link on <sourceDir> (record needed for the restore scripts)
-            print_current( "OK" )
-          } else if ( "h" == $3 ) {            # hardlink on <sourceDir> (record needed for the restore scripts)
-            print_current( "OK" )
-          }
+          print_current( "OK" )                #  (OK record needed for the restore scripts)
         }
         prr = 0
       } else {                                 ### different name on <sourceDir> and <backupDir>
