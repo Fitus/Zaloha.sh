@@ -77,11 +77,11 @@ Repository: https://github.com/Fitus/Zaloha.sh
 
 MORE DETAILED DESCRIPTION
 
-The operation of Zaloha can be partitioned into three steps, in that following
+The operation of Zaloha can be partitioned into four steps, in that following
 actions are performed:
 
-Exec1:  remove obsolete files/directories from <backupDir>, or objects of
-        conflicting types which occupy needed namespace
+Exec1:  unavoidable removals from <backupDir> (objects of conflicting types
+        which occupy needed namespace)
 -----------------------------------
 RMDIR     regular remove directory from <backupDir>
 REMOVE    regular remove file from <backupDir>
@@ -119,6 +119,16 @@ REV.UP    reverse-update file on <sourceDir> (if the file on <backupDir>
 REV.UP.!  reverse-update file on <sourceDir> which is newer
           than the last run of Zaloha
 
+Exec4:  remaining removals of obsolete files/directories from <backupDir>
+        (can be optionally switched off via the "--noRemove" option)
+-----------------------------------
+RMDIR     regular remove directory from <backupDir>
+REMOVE    regular remove file from <backupDir>
+REMOVE.!  remove file from <backupDir> which is newer than the
+          last run of Zaloha
+REMOVE.x  remove other object on <backupDir> that occupies needed namespace,
+          x = object type (l/p/s/c/b/D)
+
 (internal use, for completion only)
 -----------------------------------
 OK        object without needed action on <sourceDir> (either files or
@@ -126,17 +136,17 @@ OK        object without needed action on <sourceDir> (either files or
           not to be synchronized to <backupDir>). These records are necessary
           for preparation of shellscripts for the case of restore.
 KEEP      object to be kept only on <backupDir>
+uRMDIR    unavoidable RMDIR which goes into Exec1 (in files 380 and 390)
+uREMOVE   unavoidable REMOVE which goes into Exec1 (in files 380 and 390)
+
+INDIVIDUAL STEPS IN FULL DETAIL
 
 Exec1:
 ------
-This must be the first step, because objects of conflicting types on <backupDir>
-would prevent synchronization (e.g. a file cannot overwrite a directory).
-Zaloha removes all obsolete files and directories on <backupDir>. Other objects
-than files and directories are removed only if they occupy namespace needed to
-write files and directories to <backupDir>.
-
-Not every "standalone" file on <backupDir> is "obsolete" if "--revNew" option
-is given: see REV.NEW under Exec3.
+Unavoidable removals from <backupDir> (objects of conflicting types which occupy
+needed namespace). This must be the first step, because objects of conflicting
+types on <backupDir> would prevent synchronization (e.g. a file cannot overwrite
+a directory).
 
 Exec2:
 ------
@@ -220,7 +230,7 @@ will be used to reverse-update the older file on <sourceDir>
 Optionally, to preserve attributes during the REV.MKDI, REV.NEW and REV.UP
 operations: use options "--pRevUser", "--pRevGroup" and "--pRevMode".
 
-If reverse synchronization is not active: If no "--revNew" option is given,
+If reverse-synchronization is not active: If no "--revNew" option is given,
 then each standalone file on <backupDir> is considered obsolete (and removed).
 If no "--revUp" option is given, then files on <sourceDir> always update files
 on <backupDir> if they differ.
@@ -229,6 +239,26 @@ Reverse-synchronization to <sourceDir> increases the overall complexity of the
 solution. Use it only in the interactive regime of Zaloha, where human oversight
 and confirmation of prepared actions are in place.
 Do not use it in automatic operations.
+
+Exec4:
+------
+
+Zaloha removes all remaining obsolete files and directories from <backupDir>.
+This function can be switched off via the "--noRemove" option.
+
+Why are removals from <backupDir> split into two steps (Exec1 and Exec4)?
+Imagine a scenario when a directory is renamed on <sourceDir>: If all removals
+were concentrated in Exec1, then <backupDir> would transition through a state
+(namely between Exec1 and Exec2) when the backup copy of the directory is
+already removed (under the old name), but not yet created (under the new name).
+To prevent such transient states, the removals (except the unavoidable ones)
+are postponed to Exec4.
+
+Advise to this topic: In case of bigger reorganizations of <sourceDir>, also
+e.g. in case when a directory with large content is renamed, it is much better
+to prepare a rename script (more generally speaking: a migration script) and
+apply it to both <sourceDir> and <backupDir>, instead of letting Zaloha perform
+massive copying followed by massive removing.
 
 Metadata directory of Zaloha
 ----------------------------
@@ -241,7 +271,7 @@ Briefly, they are:
  * AWK program files (produced from "here documents" in Zaloha)
  * Shellscripts to run FIND commands
  * CSV metadata files
- * Exec1/2/3 shellscripts
+ * Exec1/2/3/4 shellscripts
  * Shellscripts for the case of restore
  * Touchfile marking execution of actions
 
@@ -468,11 +498,12 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --noExec1Hdr    ... do not write header to the shellscript for Exec1 (file 610)
 --noExec2Hdr    ... do not write header to the shellscript for Exec2 (file 620)
 --noExec3Hdr    ... do not write header to the shellscript for Exec3 (file 630)
+--noExec4Hdr    ... do not write header to the shellscript for Exec4 (file 640)
    These options can be used only together with the "--noExec" option.
-   The headers of the shellscripts for Exec1, Exec2 and Exec3 (files 610, 620
-   and 630) contain definitions used in their bodies. Scripts without headers
-   (i.e. bodies only) can be easily prepended by alternative headers that
-   contain different definitions.
+   The headers of the shellscripts for Exec1, Exec2, Exec3 and Exec4 (files 610,
+   620, 630 and 640) contain definitions used in their bodies. Scripts without
+   headers (i.e. bodies only) can be easily prepended by alternative headers
+   that contain different definitions.
 
 --noProgress    ... suppress progress messages (less screen output)
     If both options "--noExec" and "--noProgress" are used, Zaloha does not
@@ -568,6 +599,7 @@ The process which invokes Zaloha in automatic regime should function as follows
     execute script 610_exec1.sh
     execute script 620_exec2.sh
     execute script 630_exec3.sh
+    execute script 640_exec4.sh
     monitor execution (writing to stderr)
     if ( execution successful ) then
       execute script 690_touch.sh
@@ -707,12 +739,12 @@ Talking further in database developer's language: The data model of all CSV
 metadata files is the same and is described in form of comments in AWKPARSER.
 Files 310 and 320 do not qualify as tables, as their fields and records are
 broken by eventual tabs and newlines in filenames. In files 330 through 370,
-field 2 is the Source/Backup indicator. In files 380 through 530, field 2 is
+field 2 is the Source/Backup indicator. In files 380 through 540, field 2 is
 the Action Code.
 
 The natural primary key in files 330 through 360 is the file's path (column 13).
 In files 370 through 505, the natural primary key is combined column 13 with
-column 2. In files 510 through 530, the natural primary key is again
+column 2. In files 510 through 540, the natural primary key is again
 column 13 alone.
 
 The combined primary key in file 505 is obvious e.g. in the case of other object
@@ -808,7 +840,7 @@ f110Base="110_cleaner.awk"           # AWK program for handling of raw outputs o
 f130Base="130_checker.awk"           # AWK program for checking
 f150Base="150_hlinks.awk"            # AWK program for hardlink detection (inode-deduplication)
 f170Base="170_diff.awk"              # AWK program for differences processing
-f190Base="190_postproc.awk"          # AWK program for differences post-processing and splitting off Exec1 actions
+f190Base="190_postproc.awk"          # AWK program for differences post-processing and splitting off Exec1 and Exec4 actions
 
 f200Base="200_find_lastrun.sh"       # shellscript for FIND on <metaDir>/999_mark_executed
 f210Base="210_find_source.sh"        # shellscript for FIND on <sourceDir>
@@ -823,23 +855,25 @@ f350Base="350_source_s_hlinks.csv"   # <sourceDir> metadata sorted for hardlink 
 f360Base="360_source_hlinks.csv"     # <sourceDir> metadata after hardlink detection (inode-deduplication)
 f370Base="370_union_s_diff.csv"      # <sourceDir> + <backupDir> metadata united and sorted for differences processing
 f380Base="380_diff.csv"              # result of differences processing
-f390Base="390_diff_r_post.csv"       # differences result reverse sorted for post-processing and splitting off Exec1 actions
+f390Base="390_diff_r_post.csv"       # differences result reverse sorted for post-processing and splitting off Exec1 and Exec4 actions
 
 f405Base="405_select23.awk"          # AWK program for selection of Exec2 and Exec3 actions
-f410Base="410_exec1.awk"             # AWK program for preparation of shellscript for Exec1
+f410Base="410_exec1.awk"             # AWK program for preparation of shellscripts for Exec1 and Exec4
 f420Base="420_exec2.awk"             # AWK program for preparation of shellscript for Exec2
 f430Base="430_exec3.awk"             # AWK program for preparation of shellscript for Exec3
 f490Base="490_touch.awk"             # AWK program for preparation of shellscript to touch file 999_mark_executed
 
-f500Base="500_target_r.csv"          # differences result after splitting off Exec1 actions (= target state) reverse sorted
+f500Base="500_target_r.csv"          # differences result after splitting off Exec1 and Exec4 actions (= target state) reverse sorted
 f505Base="505_target.csv"            # target state (includes Exec2 and Exec3 actions) of synchronized directories
 f510Base="510_exec1.csv"             # Exec1 actions (reverse sorted)
 f520Base="520_exec2.csv"             # Exec2 actions
 f530Base="530_exec3.csv"             # Exec3 actions
+f540Base="540_exec4.csv"             # Exec4 actions (reverse sorted)
 
 f610Base="610_exec1.sh"              # shellscript for Exec1
 f620Base="620_exec2.sh"              # shellscript for Exec2
 f630Base="630_exec3.sh"              # shellscript for Exec3
+f640Base="640_exec4.sh"              # shellscript for Exec4
 f690Base="690_touch.sh"              # shellscript to touch file 999_mark_executed
 
 f700Base="700_restore.awk"           # AWK program for preparation of shellscripts for the case of restore
@@ -868,7 +902,7 @@ trap 'error_exit "Error on line ${LINENO}"' ERR
 
 function start_progress {
   if [ ${noProgress} -eq 0 ]; then
-    echo -n "    ${1} ${DOTS50:1:$(( 47 - ${#1} ))} "
+    echo -n "    ${1} ${DOTS60:1:$(( 53 - ${#1} ))} "
   fi
 }
 
@@ -915,7 +949,7 @@ FSTAB=$'\t'
 TERMNORM=$'\033'"[0m"
 TERMBLUE=$'\033'"[94m"
 DOTS10=".........."
-DOTS50="${DOTS10}${DOTS10}${DOTS10}${DOTS10}${DOTS10}"
+DOTS60="${DOTS10}${DOTS10}${DOTS10}${DOTS10}${DOTS10}${DOTS10}"
 
 ###########################################################
 sourceDir=
@@ -945,6 +979,7 @@ noDirChecks=0
 noExec1Hdr=0
 noExec2Hdr=0
 noExec3Hdr=0
+noExec4Hdr=0
 noProgress=0
 color=0
 lTest=0
@@ -980,6 +1015,7 @@ do
     --noExec1Hdr)        noExec1Hdr=1 ;;
     --noExec2Hdr)        noExec2Hdr=1 ;;
     --noExec3Hdr)        noExec3Hdr=1 ;;
+    --noExec4Hdr)        noExec4Hdr=1 ;;
     --noProgress)        noProgress=1 ;;
     --color)             color=1 ;;
     --lTest)             lTest=1 ;;
@@ -1001,6 +1037,9 @@ if [ ${noExec2Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
 fi
 if [ ${noExec3Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
   error_exit "Option --noExec3Hdr can be used only together with option --noExec"
+fi
+if [ ${noExec4Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
+  error_exit "Option --noExec4Hdr can be used only together with option --noExec"
 fi
 
 awkLint=
@@ -1180,9 +1219,11 @@ f505="${metaDir}${f505Base}"
 f510="${metaDir}${f510Base}"
 f520="${metaDir}${f520Base}"
 f530="${metaDir}${f530Base}"
+f540="${metaDir}${f540Base}"
 f610="${metaDir}${f610Base}"
 f620="${metaDir}${f620Base}"
 f630="${metaDir}${f630Base}"
+f640="${metaDir}${f640Base}"
 f690="${metaDir}${f690Base}"
 f700="${metaDir}${f700Base}"
 f800="${metaDir}${f800Base}"
@@ -1200,6 +1241,7 @@ f320Awk="${metaDirAwk}${f320Base}"
 f510Awk="${metaDirAwk}${f510Base}"
 f520Awk="${metaDirAwk}${f520Base}"
 f530Awk="${metaDirAwk}${f530Base}"
+f540Awk="${metaDirAwk}${f540Base}"
 f800Awk="${metaDirAwk}${f800Base}"
 f810Awk="${metaDirAwk}${f810Base}"
 f820Awk="${metaDirAwk}${f820Base}"
@@ -1253,6 +1295,7 @@ ${TRIPLET}${FSTAB}noDirChecks${FSTAB}${noDirChecks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec1Hdr${FSTAB}${noExec1Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec2Hdr${FSTAB}${noExec2Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec3Hdr${FSTAB}${noExec3Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noExec4Hdr${FSTAB}${noExec4Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}lTest${FSTAB}${lTest}${FSTAB}${TRIPLET}
@@ -1814,26 +1857,33 @@ function print_previous( acode ) {
 function print_current( acode ) {
   print TRIPLET, acode, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, TRIPLET, $15, TRIPLET
 }
-function remove() {
+function remove( unavoidable ) {
   if ( "d" == tp ) {
-    print_previous( "RMDIR" )
+    print_previous( unavoidable "RMDIR" )
   } else if ( "f" == tp ) {
     if (( 0 != lru ) && ( lru < tm )) {
-      print_previous( "REMOVE.!" )
+      print_previous( unavoidable "REMOVE.!" )
     } else {
-      print_previous( "REMOVE" )
+      print_previous( unavoidable "REMOVE" )
     }
   } else {
-    print_previous( "REMOVE." tp )
+    print_previous( unavoidable "REMOVE." tp )
   }
 }
-function try_to_keep_or_remove() {
-  if ( "" == xkp ) {
+function keep_or_remove( no_remove ) {
+  if ( 1 == no_remove ) {
     print_previous( "KEEP" )
-  } else if ( 1 == index( pt, xkp )) {
-    remove()                                   #  (unavoidable removal)
   } else {
-    print_previous( "KEEP" )
+    remove( "" )
+  }
+}
+function try_to_keep_or_remove( no_remove ) {
+  if ( "" == xkp ) {
+    keep_or_remove( no_remove )
+  } else if ( 1 == index( pt, xkp )) {
+    remove( "u" )                              #  (unavoidable removal)
+  } else {
+    keep_or_remove( no_remove )
     xkp = ""
   }
 }
@@ -1902,32 +1952,22 @@ function process_previous_record() {
     }
   } else {
     if ( "d" == tp ) {                         # directory only on <backupDir> (case 13)
-      if ( 1 == noRemove ) {
-        try_to_keep_or_remove()
-      } else {
-        remove()
-      }
+      try_to_keep_or_remove( noRemove )
     } else if ( "f" == tp ) {                  # file only on <backupDir> (case 14)
       if (( 1 == revNew ) && ( 0 != lru ) && ( lru < tm )) {
         if ( "" == xrn ) {
           print_previous( "REV.NEW" )
         } else if ( 1 == index( pt, xrn )) {
-          if ( 1 == noRemove ) {
-            try_to_keep_or_remove()
-          } else {
-            remove()
-          }
+          try_to_keep_or_remove( noRemove )
         } else {
           print_previous( "REV.NEW" )
           xrn = ""
         }
-      } else if ( 1 == noRemove ) {
-        try_to_keep_or_remove()
       } else {
-        remove()
+        try_to_keep_or_remove( noRemove )
       }
     } else {                                   # other object only on <backupDir> (case 15)
-      try_to_keep_or_remove()
+      try_to_keep_or_remove( 1 )
     }
   }
 }
@@ -1950,14 +1990,14 @@ function process_previous_record() {
           if ( "d" == tp ) {                   # directory on <sourceDir>, directory on <backupDir> (case 1)
             attributes_or_ok()
           } else {                             # directory on <sourceDir>, file or other object on <backupDir> (cases 2,3)
-            remove()                           #  (unavoidable removal)
+            remove( "u" )                      #  (unavoidable removal)
             print_current( "MKDIR" )
           }
         } else if ( "f" == $3 ) {              ## file on <sourceDir>
           if ( "d" == tp ) {                   # file on <sourceDir>, directory on <backupDir> (case 4)
             xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
             xkp = pt                           #  (KEEP impossible down from here due to occupied namespace)
-            remove()                           #  (unavoidable removal)
+            remove( "u" )                      #  (unavoidable removal)
             print_current( "NEW" )
           } else if ( "f" == tp ) {            # file on <sourceDir>, file on <backupDir> (case 5)
             oka = 0
@@ -2002,23 +2042,15 @@ function process_previous_record() {
               }
             }
           } else {                             # file on <sourceDir>, other object on <backupDir> (case 6)
-            remove()                           #  (unavoidable removal)
+            remove( "u" )                      #  (unavoidable removal)
             print_current( "NEW" )
           }
         } else {                               ## other object on <sourceDir>
           if ( "d" == tp ) {                   # other object on <sourceDir>, directory on <backupDir> (case 7)
             xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
-            if ( 1 == noRemove ) {
-              print_previous( "KEEP" )
-            } else {
-              remove()
-            }
+            keep_or_remove( noRemove )
           } else if ( "f" == tp ) {            # other object on <sourceDir>, file on <backupDir> (case 8)
-            if ( 1 == noRemove ) {
-              print_previous( "KEEP" )
-            } else {
-              remove()
-            }
+            keep_or_remove( noRemove )
           } else {                             # other object on <sourceDir>, other object on <backupDir> (case 9)
             print_previous( "KEEP" )
           }
@@ -2091,7 +2123,9 @@ BEGIN {
   FS = FSTAB
   OFS = FSTAB
   gsub( TRIPLETBREGEX, BSLASH, f510 )
+  gsub( TRIPLETBREGEX, BSLASH, f540 )
   printf "" > f510
+  printf "" > f540
   lrn = ""    # path of last file to REV.NEW
   lkp = ""    # path of last object to KEEP only on <backupDir>
 }
@@ -2099,7 +2133,7 @@ BEGIN {
   if ( $2 ~ /^REV\.NEW/ ) {
     lrn = $13             # remember path of last file to REV.NEW
   } else if ( $2 ~ /^KEEP/ ) {
-    if ( 1 == index( lrn, $13 )) {
+    if (( "d" == $3 ) && ( 1 == index( lrn, $13 ))) {
       $2 = "REV.MKDI"     # convert KEEP to REV.MKDI on parent directory of a file to REV.NEW
     } else {
       lkp = $13           # remember path of last object to KEEP only on <backupDir>
@@ -2111,18 +2145,26 @@ BEGIN {
       $2 = "KEEP"         # convert RMDIR to KEEP on parent directory of an object to KEEP only on <backupDir>
     }
   }
-  # modifications done, split off 510 data, output remaining data
-  if ( $2 ~ /^(RMDIR|REMOVE)/ ) {
+  # modifications done, split off 510 and 540 data, output remaining data
+  if ( $2 ~ /^(uRMDIR|uREMOVE)/ ) {
+    $2 = substr( $2, 2 )
     if ( "" != $13 ) {
       gsub( TRIPLETSREGEX, SLASH, $13 )
       $13 = substr( $13, 1, length( $13 ) - 1 )
     }
     print > f510
+  } else if ( $2 ~ /^(RMDIR|REMOVE)/ ) {
+    if ( "" != $13 ) {
+      gsub( TRIPLETSREGEX, SLASH, $13 )
+      $13 = substr( $13, 1, length( $13 ) - 1 )
+    }
+    print > f540
   } else {
     print
   }
 }
 END {
+  close( f540 )
   close( f510 )
 }
 AWKPOSTPROC
@@ -2135,11 +2177,12 @@ optim_csv_after_use "${f380}"
 
 stop_progress
 
-start_progress "Post-processing and splitting off Exec1"
+start_progress "Post-processing and splitting off Exec1 and Exec4"
 
 awk ${awkLint}            \
     -f "${f190}"          \
     -v f510="${f510Awk}"  \
+    -v f540="${f540Awk}"  \
     "${f390}"             > "${f500}"
 
 optim_csv_after_use "${f390}"
@@ -2192,7 +2235,7 @@ BEGIN {
   FS = FSTAB
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, backupDir )
-  if ( 0 == noExec1Hdr ) {
+  if ( 0 == noExecHdr ) {
     BIN_BASH
     print "backupDir='" backupDir "'"
     print "RMDIR='rmdir'"
@@ -2231,7 +2274,7 @@ awk ${awkLint}                      \
     -f "${f410}"                    \
     -v backupDir="${backupDirAwk}"  \
     -v noExec=${noExec}             \
-    -v noExec1Hdr=${noExec1Hdr}     \
+    -v noExecHdr=${noExec1Hdr}      \
     "${f510}"                       > "${f610}"
 
 stop_progress
@@ -2245,7 +2288,7 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, sourceDir )
   gsub( QUOTEREGEX, QUOTEESC, backupDir )
-  if ( 0 == noExec2Hdr ) {
+  if ( 0 == noExecHdr ) {
     BIN_BASH
     print "sourceDir='" sourceDir "'"
     print "backupDir='" backupDir "'"
@@ -2353,7 +2396,7 @@ awk ${awkLint}                      \
     -v pUser=${pUser}               \
     -v pGroup=${pGroup}             \
     -v pMode=${pMode}               \
-    -v noExec2Hdr=${noExec2Hdr}     \
+    -v noExecHdr=${noExec2Hdr}      \
     "${f520}"                       > "${f620}"
 
 stop_progress
@@ -2367,7 +2410,7 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, sourceDir )
   gsub( QUOTEREGEX, QUOTEESC, backupDir )
-  if ( 0 == noExec3Hdr ) {
+  if ( 0 == noExecHdr ) {
     BIN_BASH
     print "sourceDir='" sourceDir "'"
     print "backupDir='" backupDir "'"
@@ -2472,7 +2515,7 @@ if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
       -v pRevUser=${pRevUser}         \
       -v pRevGroup=${pRevGroup}       \
       -v pRevMode=${pRevMode}         \
-      -v noExec3Hdr=${noExec3Hdr}     \
+      -v noExecHdr=${noExec3Hdr}      \
       "${f530}"                       > "${f630}"
 
   stop_progress
@@ -2483,6 +2526,31 @@ else
 
   if [ -s "${f530}" ]; then
     error_exit "Unexpected, REV actions prepared although neither --revNew nor --revUp options given"
+  fi
+
+fi
+
+###########################################################
+
+if [ ${noRemove} -eq 0 ]; then
+
+  start_progress "Preparing shellscript for Exec4"
+
+  awk ${awkLint}                      \
+      -f "${f410}"                    \
+      -v backupDir="${backupDirAwk}"  \
+      -v noExec=${noExec}             \
+      -v noExecHdr=${noExec4Hdr}      \
+      "${f540}"                       > "${f640}"
+
+  stop_progress
+
+else
+
+  file_not_prepared "${f640}"
+
+  if [ -s "${f540}" ]; then
+    error_exit "Unexpected, avoidable removals prepared although --noRemove option given"
   fi
 
 fi
@@ -2674,13 +2742,13 @@ if [ ${noExec} -eq 1 ]; then
   exit 0
 fi
 
-echo
-echo "TO BE REMOVED FROM ${backupDirTerm}"
-echo "==========================================="
-
-awk ${awkLint} -f "${f104}" -v color=${color} "${f510}"
-
 if [ -s "${f510}" ]; then
+  echo
+  echo "UNAVOIDABLE REMOVALS FROM ${backupDirTerm}"
+  echo "==========================================="
+
+  awk ${awkLint} -f "${f104}" -v color=${color} "${f510}"
+
   if [ ${noRemove} -eq 1 ]; then
     echo
     echo "WARNING: Unavoidable removals prepared regardless of the --noRemove option"
@@ -2725,6 +2793,25 @@ if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
     if [ "Y" == "${tmpVal/y/Y}" ]; then
       echo
       bash "${f630}" | awk ${awkLint} -f "${f102}" -v color=${color}
+    else
+      error_exit "User requested Zaloha to abort"
+    fi
+  fi
+fi
+
+if [ ${noRemove} -eq 0 ]; then
+  echo
+  echo "TO BE REMOVED FROM ${backupDirTerm}"
+  echo "==========================================="
+
+  awk ${awkLint} -f "${f104}" -v color=${color} "${f540}"
+
+  if [ -s "${f540}" ]; then
+    echo
+    read -p "Execute above listed removals from ${backupDirTerm} ? [Y/y=Yes, other=do nothing and abort]: " tmpVal
+    if [ "Y" == "${tmpVal/y/Y}" ]; then
+      echo
+      bash "${f640}" | awk ${awkLint} -f "${f102}" -v color=${color}
     else
       error_exit "User requested Zaloha to abort"
     fi
