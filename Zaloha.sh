@@ -292,16 +292,6 @@ shellscript, to give maximum freedom (= for each script, decide whether to apply
 or to not apply). Further, each shellscript has a header part where
 key variables for whole script are defined (and can be adjusted as needed).
 
-The script to copy files (script 810) needs (as the only one) access to both
-directories, and is expected to be the most time consuming. In some situations,
-copying files in parallel might speed things up (especially when many small
-files should be copied over a network). For that case, the 810 script contains
-support for parallel operation of up to 8 parallel processes. To utilize this,
-create 8 copies of the 810 script. In the header of the first copy, keep only
-CP1 and TOUCH1 assigned to real commands, and assign the remaining ones to
-empty command (:). Adjust the other copies accordingly.
-Then run the copies in parallel.
-
 ###########################################################
 
 INVOCATION
@@ -315,23 +305,22 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     throws an error (except when the "--noDirChecks" option is given).
 
 --findSourceOps=<findSourceOps> are additional operands for FIND command that
-    searches <sourceDir>. It allows to implement any filtering achievable by
-    FIND operands. Please see the FIND manual page for more info. The operands
-    must form an OR-connected chain: operandA -o operandB -o operandC -o ...
-    This is required because Zaloha internally combines <findSourceOps> with
-    <findGeneralOps> and with own operands, and all of them follow this
-    convention. If an earlier operand in the OR-connected chain evaluates TRUE,
-    FIND does not evaluate following operands, leading to no output being
-    produced. The main use of <findSourceOps> is to exclude individual files
-    and subdirectories from synchronization:
+    searches <sourceDir>, to be used to exclude files or subdirectories from
+    synchronization, based on file path or file name patterns:
 
-    a) exclude whole subdirectories on <sourceDir> (= don't descend into them):
-      -path <subdir path pattern> -prune -o
-      -name <subdir name pattern> -prune -o
+      -path <file path pattern> -prune -o
+      -name <file name pattern> -prune -o
 
-    b) exclude individual files on <sourceDir>:
-      -path <file path pattern> -o
-      -name <file name pattern> -o
+    If the pattern matches a subdirectory, the "-prune" operand instructs FIND
+    to not descend into it.
+
+    Each expression must be followed by the OR operator (-o). If several
+    expressions are given, they must form an OR-connected chain:
+    expressionA -o expressionB -o expressionC -o ... This is required because
+    Zaloha internally combines <findSourceOps> with <findGeneralOps> and with
+    own operands, and all of them follow this convention. If an earlier
+    expression in the OR-connected chain evaluates TRUE, FIND does not evaluate
+    following operands, leading to no output being produced. 
 
     <findSourceOps> applies only to <sourceDir>. If a file on <sourceDir> is
     excluded by <findSourceOps> and the same file exists on <backupDir>,
@@ -353,31 +342,33 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     backslash-escaped. Again, take care of protecting backslashes from your
     shell.
 
-    <findSourceOps> may contain the placeholder ///d/ for <sourceDir> (more
-    precisely, <sourceDir> followed by the directory separator and properly
-    escaped for use in FIND patterns).
+    If the expression with the "-path" test is used, the placeholder ///d/
+    should be used in place of <sourceDir>/. Zaloha will replace ///d/ by
+    <sourceDir>/ in the form that is passed to FIND, and with eventual FIND
+    pattern special characters properly escaped (which relieves you from doing
+    the same by yourself).
 
-    Examples: * exclude subdirectory <sourceDir>/.git,
-              * exclude all subdirectories Windows Security
-              * exclude all files My "Secret" Things
+    Examples: * exclude <sourceDir>/.git,
+              * exclude all files or subdirectories Windows Security
+              * exclude all files or subdirectories My "Secret" Things
 
     (double-quoted and single-quoted versions):
 
     --findSourceOps="-path ///d/.git -prune -o"
     --findSourceOps="-name \"Windows Security\" -prune -o"
-    --findSourceOps="-name \"My \\\"Secret\\\" Things\" -o"
+    --findSourceOps="-name \"My \\\"Secret\\\" Things\" -prune -o"
 
     --findSourceOps='-path ///d/.git -prune -o'
     --findSourceOps='-name "Windows Security" -prune -o'
-    --findSourceOps='-name "My \"Secret\" Things" -o'
+    --findSourceOps='-name "My \"Secret\" Things" -prune -o'
 
---findGeneralOps=<findGeneralOps> underlies the same rules as <findSourceOps>.
-    The key difference is that <findGeneralOps> acts on both <sourceDir> and
-    <backupDir>. Hence, generally speaking, it can be used to constrain
-    synchronization to only subsets of files and subdirectories, based on
-    filtering by FIND operands. The main use of <findGeneralOps> is to exclude
-    "Trash" subdirectories from synchronization. <findGeneralOps> has an
-    internally defined default, used to exclude:
+--findGeneralOps=<findGeneralOps> underlies the same rules as <findSourceOps>
+    (please read first). The key difference is that <findGeneralOps> applies to
+    both <sourceDir> and <backupDir>. This means, that files and subdirectories
+    excluded by <findGeneralOps> are not visible to Zaloha, so Zaloha will not
+    act on them. The main use of <findGeneralOps> is to exclude "Trash"
+    subdirectories from synchronization. <findGeneralOps> has an internally
+    defined default, used to exclude:
 
     <sourceDir or backupDir>/$RECYCLE.BIN
       ... Windows Recycle Bin (assumed to exist directly under <sourceDir> or
@@ -391,10 +382,19 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
       ... Linux lost + found filesystem fragments (assumed to exist directly
           under <sourceDir> or <backupDir>)
 
-    The placeholder ///d/ is for <sourceDir> or <backupDir>, depending on the
-    actual search. To extend (= combine, not replace) the internally defined
-    <findGeneralOps> with own extension, pass in own extension prepended by the
-    plus sign ("+").
+    The placeholder ///d/ is for <sourceDir>/ or <backupDir>/, depending on the
+    actual search, and it must be used if the expression with the "-path" test
+    is used, unless, perhaps, the <sourceDir> and <backupDir> parts of the paths
+    are matched by a wildcard.
+
+    Beware of matching <sourceDir> or <backupDir> themselves by the patterns.
+
+    To extend (= combine, not replace) the internally defined <findGeneralOps>
+    with own extension, pass in own extension prepended by the plus sign ("+").
+
+    *** CAUTION <findSourceOps> AND <findGeneralOps>: Zaloha will not prevent
+    passing in other FIND expressions than described above, to allow eventual
+    advanced use by knowledgeable users.
 
 --noExec        ... needed if Zaloha is invoked automatically: do not ask,
     do not execute the actions, but still prepare the scripts. The prepared
@@ -467,6 +467,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
       a) non-writable <backupDir> (if Zaloha is used to perform comparison only
         (i.e. with "--noExec" option))
       b) a requirement to have Zaloha metadata on a separate storage
+      c) advanced use of Zaloha, see Advanced Use of Zaloha section below
     It is possible (but not recommended) to place <metaDir> to a different
     location inside of <backupDir>, or inside of <sourceDir>. In such cases,
     FIND operands to exclude the metadata directory from the FIND searches must
@@ -474,36 +475,30 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     If Zaloha is used to synchronize multiple directories, then each such
     instance of Zaloha must have its own separate metadata directory.
 
+--noDirChecks   ... switch off the checks for existence of <sourceDir> and
+    <backupDir>. (Explained in the Advanced Use of Zaloha section below).
+
 --noFindSource  ... do not run FIND (script 210) to search <sourceDir>
                     and use externally supplied CSV metadata file 310 instead
 --noFindBackup  ... do not run FIND (script 220) to search <backupDir>
                     and use externally supplied CSV metadata file 320 instead
-   Use these options if you have better (especially performance-wise) methods
-   for obtaining the CSV metadata files 310 and/or 320. For instance, if
-   <sourceDir> and/or <backupDir> are network-mounted directories, running FIND
-   commands on them might be slow. Running FIND directly on the file server
-   (e.g. via SSH) and downloading the resulting CSV metadata file should be
-   much quicker. The externally supplied CSV metadata files 310 and/or 320 must
-   be placed into the Zaloha metadata directory before invoking Zaloha, and
-   these files must, of course, have the same format as the CSV metadata files
-   that would otherwise be produced by the scripts 210 and/or 220.
-
---noDirChecks   ... switch off the checks for existence of <sourceDir> and
-    <backupDir>. This is useful in connection with the options "--metaDir",
-    "--noFindSource" and/or "--noFindBackup" and "--noExec", because they
-    make it possible to run Zaloha without <sourceDir> and/or <backupDir> being
-    accessible. In the extreme case, when all these options are used, Zaloha
-    operates solely on its metadata directory.
+   (Explained in the Advanced Use of Zaloha section below).
 
 --noExec1Hdr    ... do not write header to the shellscript for Exec1 (file 610)
 --noExec2Hdr    ... do not write header to the shellscript for Exec2 (file 620)
 --noExec3Hdr    ... do not write header to the shellscript for Exec3 (file 630)
 --noExec4Hdr    ... do not write header to the shellscript for Exec4 (file 640)
    These options can be used only together with the "--noExec" option.
-   The headers of the shellscripts for Exec1, Exec2, Exec3 and Exec4 (files 610,
-   620, 630 and 640) contain definitions used in their bodies. Scripts without
-   headers (i.e. bodies only) can be easily prepended by alternative headers
-   that contain different definitions.
+   (Explained in the Advanced Use of Zaloha section below).
+
+--noR800Hdr     ... do not write header to the restore script 800
+--noR810Hdr     ... do not write header to the restore script 810
+--noR820Hdr     ... do not write header to the restore script 820
+--noR830Hdr     ... do not write header to the restore script 830
+--noR840Hdr     ... do not write header to the restore script 840
+--noR850Hdr     ... do not write header to the restore script 850
+--noR860Hdr     ... do not write header to the restore script 860
+   (Explained in the Advanced Use of Zaloha section below).
 
 --noProgress    ... suppress progress messages (less screen output)
     If both options "--noExec" and "--noProgress" are used, Zaloha does not
@@ -825,6 +820,90 @@ code page for national characters in filenames, because Zaloha does not contain
 any code page conversions.
 
 ###########################################################
+
+ADVANCED USE OF ZALOHA - DIRECTORIES NOT AVAILABLE LOCALLY
+
+Zaloha contains several options to handle situations when <sourceDir> and/or
+<backupDir> are not available locally. In the extreme case, Zaloha can be used
+as a mere "difference engine" by a wrapper script, which obtains the inputs
+(FIND data from <sourceDir> and/or <backupDir>) remotely, and also applies the
+outputs (= executes the Exec1/2/3/4 scripts) remotely.
+
+First useful option is "--noDirChecks": This switches off the checks for local
+existence of <sourceDir> and <backupDir>.
+
+If <backupDir> is not available locally, it is necessary to use the "--metaDir"
+option to place the Zaloha metadata directory to a different location accessible
+to Zaloha.
+
+Next useful options are "--noFindSource" and/or "--noFindBackup": They instruct
+Zaloha to not run FIND on <sourceDir> and/or <backupDir>, but use externally
+supplied CSV metadata files 310 and/or 320 instead. This means that these files
+must be produced by the wrapper script (e.g. by running FIND commands in an SSH
+session) and downloaded to the Zaloha metadata directory before invoking Zaloha.
+These files must, of course, have the same names and formats as the CSV metadata
+files that would otherwise be produced by the scripts 210 and/or 220.
+
+The "--noFindSource" and/or "--noFindBackup" options are also useful when
+network-mounted directories are available locally, but running FIND on them is
+slow. Running the FINDs directly on the respective file servers in SSH sessions
+should be much quicker.
+
+If <sourceDir> or <backupDir> are not available locally, the "--noExec" option
+must be used to prevent execution of the Exec1/2/3/4 scripts by Zaloha itself.
+
+Last set of useful options are "--noExec1Hdr" through "--noExec4Hdr". They
+instruct Zaloha to produce header-less Exec1/2/3/4 scripts (i.e. bodies only).
+The headers normally contain definitions used in the bodies of the scripts.
+Header-less scripts can be easily used with alternative headers that contain
+different definitions. This gives much flexibility:
+
+The "command variables" can be assigned to different commands (e.g. cp -> scp).
+Own shell functions can be defined and assigned to the "command variables".
+This makes more elaborate processing possible, as well as calling commands that
+have different order of command line arguments. Next, the "directory variables"
+sourceDir and backupDir can be assigned to empty strings, thus causing the paths
+passed to the commands to be not prefixed by <sourceDir> or <backupDir>.
+
+###########################################################
+
+ADVANCED USE OF ZALOHA - COPYING FILES IN PARALLEL
+
+First, let's clarify when parallel operations do not make sense: When copying
+files locally, even one single process will probably fully utilize the available
+bus capacity. In such cases, copying files in parallel does not make sense.
+
+Contrary to this, imagine what happens when a process copies a small file over
+a network with high latency: sending out the small file takes microseconds,
+but waiting for the network round-trip to finish takes milliseconds. Also, the
+process is idle most of the time, and the network capacity is under-utilized.
+In such cases, also typically when many small files are copied over a network,
+running the processes in parallel will speed up the process significantly.
+
+Zaloha provides support for parallel operations of up to 8 parallel processes
+(variable MAXPARALLEL). How to utilize this support:
+
+Let's take the Exec2 script as an example (file 620): make 1+8=9 copies of the
+Exec2 script. In the header of the first copy, keep only MKDIR, CHOWN_DIR,
+CHGRP_DIR and CHMOD_DIR assigned to real commands, and assign all other
+"command variables" to the empty command (shell builtin ":"). This first copy
+will hence prepare only the directories and must run first. In the next copy,
+keep only CP1, TOUCH1, UNLINK1, CHOWN1, CHGRP1 and CHMOD1 assigned to real
+commands. In the over-next copy, keep only CP2, TOUCH2, UNLINK2, CHOWN2, CHGRP2
+and CHMOD2 assigned to real commands, and so on in the other copies. Each of
+these remaining 8 copies will hence process only its own portion of files, so
+they can be run in parallel.
+
+These manipulations should, of course, be automated by a wrapper script: The
+wrapper script should invoke Zaloha with the "--noExec" and "--noExec2Hdr"
+options, also Zaloha prepares the 620 script without header (i.e. body only).
+The wrapper script should prepare the 1+8 different headers and use them
+with the header-less 620 script.
+
+Exec1 and Exec4: use the same recipe, except that the one script which removes
+the directories must run last, of course, not first.
+
+###########################################################
 ZALOHADOCU
 }
 
@@ -973,13 +1052,20 @@ pRevMode=0
 noRestore=0
 optimCSV=0
 metaDir=
+noDirChecks=0
 noFindSource=0
 noFindBackup=0
-noDirChecks=0
 noExec1Hdr=0
 noExec2Hdr=0
 noExec3Hdr=0
 noExec4Hdr=0
+noR800Hdr=0
+noR810Hdr=0
+noR820Hdr=0
+noR830Hdr=0
+noR840Hdr=0
+noR850Hdr=0
+noR860Hdr=0
 noProgress=0
 color=0
 lTest=0
@@ -1009,13 +1095,20 @@ do
     --noRestore)         noRestore=1 ;;
     --optimCSV)          optimCSV=1 ;;
     --metaDir=*)         metaDir="M${tmpVal#*=}" ;;
+    --noDirChecks)       noDirChecks=1 ;;
     --noFindSource)      noFindSource=1 ;;
     --noFindBackup)      noFindBackup=1 ;;
-    --noDirChecks)       noDirChecks=1 ;;
     --noExec1Hdr)        noExec1Hdr=1 ;;
     --noExec2Hdr)        noExec2Hdr=1 ;;
     --noExec3Hdr)        noExec3Hdr=1 ;;
     --noExec4Hdr)        noExec4Hdr=1 ;;
+    --noR800Hdr)         noR800Hdr=1 ;;
+    --noR810Hdr)         noR810Hdr=1 ;;
+    --noR820Hdr)         noR820Hdr=1 ;;
+    --noR830Hdr)         noR830Hdr=1 ;;
+    --noR840Hdr)         noR840Hdr=1 ;;
+    --noR850Hdr)         noR850Hdr=1 ;;
+    --noR860Hdr)         noR860Hdr=1 ;;
     --noProgress)        noProgress=1 ;;
     --color)             color=1 ;;
     --lTest)             lTest=1 ;;
@@ -1289,13 +1382,20 @@ ${TRIPLET}${FSTAB}metaDirAwk${FSTAB}${metaDirAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirPattAwk${FSTAB}${metaDirPattAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirDefault${FSTAB}${metaDirDefault}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirEsc${FSTAB}${metaDirEsc}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noDirChecks${FSTAB}${noDirChecks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindSource${FSTAB}${noFindSource}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindBackup${FSTAB}${noFindBackup}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}noDirChecks${FSTAB}${noDirChecks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec1Hdr${FSTAB}${noExec1Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec2Hdr${FSTAB}${noExec2Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec3Hdr${FSTAB}${noExec3Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec4Hdr${FSTAB}${noExec4Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noR800Hdr${FSTAB}${noR800Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noR810Hdr${FSTAB}${noR810Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noR820Hdr${FSTAB}${noR820Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noR830Hdr${FSTAB}${noR830Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noR840Hdr${FSTAB}${noR840Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noR850Hdr${FSTAB}${noR850Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noR860Hdr${FSTAB}${noR860Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}lTest${FSTAB}${lTest}${FSTAB}${TRIPLET}
@@ -1333,6 +1433,7 @@ BEGIN {
   gsub( /DEFINE_WARNING/, war )
   gsub( /BIN_BASH/, "print \"#!/bin/bash\"" )
   gsub( /SECTION_LINE/, "print \"#\" FSTAB TRIPLET" )
+  gsub( /MAXPARALLEL/, "8" )
   gsub( /TABREGEX/, "/\\t/" )
   gsub( /FSTAB/, "\"\\t\"" )
   gsub( /TAB/, "\"\\t\"" )
@@ -2233,13 +2334,17 @@ awk ${awkLint} -f "${f100}" << 'AWKEXEC1' > "${f410}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
+  pin = 1         # parallel index
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, backupDir )
   if ( 0 == noExecHdr ) {
     BIN_BASH
     print "backupDir='" backupDir "'"
     print "RMDIR='rmdir'"
-    print "RM='rm -f'"
+    for ( i = 1; i <= MAXPARALLEL; i++ ) {
+      print "RM" i "='rm -f'"
+    }
+    print "set -u"
     if ( 0 == noExec ) {
       print "BASH_XTRACEFD=1"
       print "PS4='    '"
@@ -2258,7 +2363,12 @@ BEGIN {
   if ( $2 ~ /^RMDIR/ ) {
     print "${RMDIR} " b
   } else if ( $2 ~ /^REMOVE/ ) {
-    print "${RM} " b
+    print "${RM" pin "} " b
+    if ( MAXPARALLEL <= pin ) {
+      pin = 1
+    } else {
+      pin = pin + 1
+    }
   } else {
     error_exit( "Unexpected action code" )
   }
@@ -2284,6 +2394,7 @@ awk ${awkLint} -f "${f100}" << 'AWKEXEC2' > "${f420}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
+  pin = 1         # parallel index
   gsub( TRIPLETBREGEX, BSLASH, sourceDir )
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, sourceDir )
@@ -2294,23 +2405,41 @@ BEGIN {
     print "backupDir='" backupDir "'"
     print "MKDIR='mkdir'"
     if ( 1 == touch ) {
-      print "CP='cp'"
-      print "TOUCH='touch -r'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CP" i "='cp'"
+      }
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "TOUCH" i "='touch -r'"
+      }
     } else {
-      print "CP='cp --preserve=timestamps'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CP" i "='cp --preserve=timestamps'"
+      }
     }
     if ( 0 == noUnlink ) {
-      print "UNLINK='rm -f'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "UNLINK" i "='rm -f'"
+      }
     }
     if ( 1 == pUser ) {
-      print "CHOWN='chown'"
+      print "CHOWN_DIR='chown'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CHOWN" i "='chown'"
+      }
     }
     if ( 1 == pGroup ) {
-      print "CHGRP='chgrp'"
+      print "CHGRP_DIR='chgrp'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CHGRP" i "='chgrp'"
+      }
     }
     if ( 1 == pMode ) {
-      print "CHMOD='chmod'"
+      print "CHMOD_DIR='chmod'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CHMOD" i "='chmod'"
+      }
     }
+    print "set -u"
     if ( 0 == noExec ) {
       print "BASH_XTRACEFD=1"
       print "PS4='    '"
@@ -2320,21 +2449,39 @@ BEGIN {
   }
   SECTION_LINE
 }
+function apply_attr_dir() {
+  if ( 1 == pUser ) {
+    print "${CHOWN_DIR} " u " " b
+  }
+  if ( 1 == pGroup ) {
+    print "${CHGRP_DIR} " g " " b
+  }
+  if ( 1 == pMode ) {
+    print "${CHMOD_DIR} " m " " b
+  }
+}
 function copy_file() {
-  print "${CP} " s " " b
+  print "${CP" pin "} " s " " b
   if ( 1 == touch ) {
-    print "${TOUCH} " s " " b
+    print "${TOUCH" pin "} " s " " b
   }
 }
 function apply_attr() {
   if ( 1 == pUser ) {
-    print "${CHOWN} " u " " b
+    print "${CHOWN" pin "} " u " " b
   }
   if ( 1 == pGroup ) {
-    print "${CHGRP} " g " " b
+    print "${CHGRP" pin "} " g " " b
   }
   if ( 1 == pMode ) {
-    print "${CHMOD} " m " " b
+    print "${CHMOD" pin "} " m " " b
+  }
+}
+function next_pin() {
+  if ( MAXPARALLEL <= pin ) {
+    pin = 1
+  } else {
+    pin = pin + 1
   }
 }
 {
@@ -2354,27 +2501,31 @@ function apply_attr() {
   b = "\"${backupDir}\"'" pt "'"
   if ( $2 ~ /^MKDIR/ ) {
     print "${MKDIR} " b
-    apply_attr()
+    apply_attr_dir()
   } else if ( $2 ~ /^NEW/ ) {
     copy_file()
     apply_attr()
+    next_pin()
   } else if ( $2 ~ /^UPDATE/ ) {
     copy_file()
     apply_attr()
+    next_pin()
   } else if ( $2 ~ /^unl\.UP/ ) {
-    print "${UNLINK} " b
+    print "${UNLINK" pin "} " b
     copy_file()
     apply_attr()
+    next_pin()
   } else if ( $2 ~ /^ATTR/ ) {
     if ( $2 ~ /u/ ) {
-      print "${CHOWN} " u " " b
+      print "${CHOWN" pin "} " u " " b
     }
     if ( $2 ~ /g/ ) {
-      print "${CHGRP} " g " " b
+      print "${CHGRP" pin "} " g " " b
     }
     if ( $2 ~ /m/ ) {
-      print "${CHMOD} " m " " b
+      print "${CHMOD" pin "} " m " " b
     }
+    next_pin()
   } else {
     error_exit( "Unexpected action code" )
   }
@@ -2406,6 +2557,7 @@ awk ${awkLint} -f "${f100}" << 'AWKEXEC3' > "${f430}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
+  pin = 1         # parallel index
   gsub( TRIPLETBREGEX, BSLASH, sourceDir )
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, sourceDir )
@@ -2414,28 +2566,53 @@ BEGIN {
     BIN_BASH
     print "sourceDir='" sourceDir "'"
     print "backupDir='" backupDir "'"
-    print "MKDIR='mkdir'"
-    if ( 1 == touch ) {
-      print "CP='cp'"
-      print "TOUCH='touch -r'"
-    } else {
-      print "CP='cp --preserve=timestamps'"
-    }
-    if ( 1 == pRevUser ) {
-      print "CHOWN='chown'"
-    }
-    if ( 1 == pRevGroup ) {
-      print "CHGRP='chgrp'"
-    }
-    if ( 1 == pRevMode ) {
-      print "CHMOD='chmod'"
-    }
     print "function rev_exists_err {"
+    print "  { set +x; } > /dev/null"
     print "  echo \"Zaloha: Object exists on <sourceDir> (masked by <findSourceOps> ?): $1\" >&2"
     if ( 0 == noExec ) {
       print "  exit 1"
     }
     print "}"
+    print "TEST_DIR='['"
+    print "REV_EXISTS_ERR_DIR='rev_exists_err'"
+    print "MKDIR='mkdir'"
+    for ( i = 1; i <= MAXPARALLEL; i++ ) {
+      print "TEST" i "='['"
+    }
+    for ( i = 1; i <= MAXPARALLEL; i++ ) {
+      print "REV_EXISTS_ERR" i "='rev_exists_err'"
+    }
+    if ( 1 == touch ) {
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CP" i "='cp'"
+      }
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "TOUCH" i "='touch -r'"
+      }
+    } else {
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CP" i "='cp --preserve=timestamps'"
+      }
+    }
+    if ( 1 == pRevUser ) {
+      print "CHOWN_DIR='chown'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CHOWN" i "='chown'"
+      }
+    }
+    if ( 1 == pRevGroup ) {
+      print "CHGRP_DIR='chgrp'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CHGRP" i "='chgrp'"
+      }
+    }
+    if ( 1 == pRevMode ) {
+      print "CHMOD_DIR='chmod'"
+      for ( i = 1; i <= MAXPARALLEL; i++ ) {
+        print "CHMOD" i "='chmod'"
+      }
+    }
+    print "set -u"
     if ( 0 == noExec ) {
       print "BASH_XTRACEFD=1"
       print "PS4='    '"
@@ -2445,24 +2622,45 @@ BEGIN {
   }
   SECTION_LINE
 }
+function rev_check_nonex_dir() {
+  print "${TEST_DIR} ! -e " s " ] || ${REV_EXISTS_ERR_DIR} '" ptt "'"
+}
+function rev_apply_attr_dir() {
+  if ( 1 == pRevUser ) {
+    print "${CHOWN_DIR} " u " " s
+  }
+  if ( 1 == pRevGroup ) {
+    print "${CHGRP_DIR} " g " " s
+  }
+  if ( 1 == pRevMode ) {
+    print "${CHMOD_DIR} " m " " s
+  }
+}
 function rev_check_nonex() {
-  print "[ ! -e " s " ] || rev_exists_err '" ptt "'"
+  print "${TEST" pin "} ! -e " s " ] || ${REV_EXISTS_ERR" pin "} '" ptt "'"
 }
 function rev_copy_file() {
-  print "${CP} " b " " s
+  print "${CP" pin "} " b " " s
   if ( 1 == touch ) {
-    print "${TOUCH} " b " " s
+    print "${TOUCH" pin "} " b " " s
   }
 }
 function rev_apply_attr() {
   if ( 1 == pRevUser ) {
-    print "${CHOWN} " u " " s
+    print "${CHOWN" pin "} " u " " s
   }
   if ( 1 == pRevGroup ) {
-    print "${CHGRP} " g " " s
+    print "${CHGRP" pin "} " g " " s
   }
   if ( 1 == pRevMode ) {
-    print "${CHMOD} " m " " s
+    print "${CHMOD" pin "} " m " " s
+  }
+}
+function next_pin() {
+  if ( MAXPARALLEL <= pin ) {
+    pin = 1
+  } else {
+    pin = pin + 1
   }
 }
 {
@@ -2483,16 +2681,18 @@ function rev_apply_attr() {
   s = "\"${sourceDir}\"'" pt "'"
   b = "\"${backupDir}\"'" pt "'"
   if ( $2 ~ /^REV\.MKDI/ ) {
-    rev_check_nonex()
+    rev_check_nonex_dir()
     print "${MKDIR} " s
-    rev_apply_attr()
+    rev_apply_attr_dir()
   } else if ( $2 ~ /^REV\.NEW/ ) {
     rev_check_nonex()
     rev_copy_file()
     rev_apply_attr()
+    next_pin()
   } else if ( $2 ~ /^REV\.UP/ ) {
     rev_copy_file()
     rev_apply_attr()
+    next_pin()
   } else {
     error_exit( "Unexpected action code" )
   }
@@ -2563,6 +2763,7 @@ BEGIN {
   BIN_BASH
   print "metaDir='" metaDir "'"
   print "TOUCH='touch -r'"
+  print "set -u"
   SECTION_LINE
   print "${TOUCH} \"${metaDir}\"" f000Base \
                 " \"${metaDir}\"" f999Base
@@ -2584,7 +2785,7 @@ stop_progress
 awk ${awkLint} -f "${f100}" << 'AWKRESTORE' > "${f700}"
 BEGIN {
   FS = FSTAB
-  pin = 1         # parallel index for 810 script
+  pin = 1         # parallel index
   gsub( TRIPLETBREGEX, BSLASH, backupDir )
   gsub( TRIPLETBREGEX, BSLASH, restoreDir )
   gsub( TRIPLETBREGEX, BSLASH, f800 )
@@ -2596,43 +2797,65 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, f860 )
   gsub( QUOTEREGEX, QUOTEESC, backupDir )
   gsub( QUOTEREGEX, QUOTEESC, restoreDir )
-  BIN_BASH > f800
-  BIN_BASH > f810
-  BIN_BASH > f820
-  BIN_BASH > f830
-  BIN_BASH > f840
-  BIN_BASH > f850
-  BIN_BASH > f860
-  print "restoreDir='" restoreDir "'" > f800
-  print "backupDir='" backupDir "'" > f810
-  print "restoreDir='" restoreDir "'" > f810
-  print "restoreDir='" restoreDir "'" > f820
-  print "restoreDir='" restoreDir "'" > f830
-  print "restoreDir='" restoreDir "'" > f840
-  print "restoreDir='" restoreDir "'" > f850
-  print "restoreDir='" restoreDir "'" > f860
-  print "MKDIR='mkdir'" > f800
-  print "CP1='cp'" > f810
-  print "CP2='cp'" > f810
-  print "CP3='cp'" > f810
-  print "CP4='cp'" > f810
-  print "CP5='cp'" > f810
-  print "CP6='cp'" > f810
-  print "CP7='cp'" > f810
-  print "CP8='cp'" > f810
-  print "TOUCH1='touch -r'" > f810
-  print "TOUCH2='touch -r'" > f810
-  print "TOUCH3='touch -r'" > f810
-  print "TOUCH4='touch -r'" > f810
-  print "TOUCH5='touch -r'" > f810
-  print "TOUCH6='touch -r'" > f810
-  print "TOUCH7='touch -r'" > f810
-  print "TOUCH8='touch -r'" > f810
-  print "LNSYMB='ln -s --'" > f820
-  print "LNHARD='ln'" > f830
-  print "CHOWN='chown -h'" > f840
-  print "CHGRP='chgrp -h'" > f850
-  print "CHMOD='chmod'" > f860
+  if ( 0 == noR800Hdr ) {
+    BIN_BASH > f800
+    print "restoreDir='" restoreDir "'" > f800
+    print "MKDIR='mkdir'" > f800
+    print "set -u" > f800
+  }
+  if ( 0 == noR810Hdr ) {
+    BIN_BASH > f810
+    print "backupDir='" backupDir "'" > f810
+    print "restoreDir='" restoreDir "'" > f810
+    for ( i = 1; i <= MAXPARALLEL; i++ ) {
+      print "CP" i "='cp'" > f810
+    }
+    for ( i = 1; i <= MAXPARALLEL; i++ ) {
+      print "TOUCH" i "='touch -r'" > f810
+    }
+    print "set -u" > f810
+  }
+  if ( 0 == noR820Hdr ) {
+    BIN_BASH > f820
+    print "restoreDir='" restoreDir "'" > f820
+    print "LNSYMB='ln -s --'" > f820
+    print "set -u" > f820
+  }
+  if ( 0 == noR830Hdr ) {
+    BIN_BASH > f830
+    print "restoreDir='" restoreDir "'" > f830
+    print "LNHARD='ln'" > f830
+    print "set -u" > f830
+  }
+  if ( 0 == noR840Hdr ) {
+    BIN_BASH > f840
+    print "restoreDir='" restoreDir "'" > f840
+    print "CHOWN_DIR='chown'" > f840
+    for ( i = 1; i <= MAXPARALLEL; i++ ) {
+      print "CHOWN" i "='chown'" > f840
+    }
+    print "CHOWN_LNSYMB='chown -h'" > f840
+    print "set -u" > f840
+  }
+  if ( 0 == noR850Hdr ) {
+    BIN_BASH > f850
+    print "restoreDir='" restoreDir "'" > f850
+    print "CHGRP_DIR='chgrp'" > f850
+    for ( i = 1; i <= MAXPARALLEL; i++ ) {
+      print "CHGRP" i "='chgrp'" > f850
+    }
+    print "CHGRP_LNSYMB='chgrp -h'" > f850
+    print "set -u" > f850
+  }
+  if ( 0 == noR860Hdr ) {
+    BIN_BASH > f860
+    print "restoreDir='" restoreDir "'" > f860
+    print "CHMOD_DIR='chmod'" > f860
+    for ( i = 1; i <= MAXPARALLEL; i++ ) {
+      print "CHMOD" i "='chmod'" > f860
+    }
+    print "set -u" > f860
+  }
   SECTION_LINE > f800
   SECTION_LINE > f810
   SECTION_LINE > f820
@@ -2664,24 +2887,24 @@ BEGIN {
     o = "\"${restoreDir}\"'" ol "'"
     if ( "d" == $3 ) {
       print "${MKDIR} " r > f800
-      print "${CHOWN} " u " " r > f840
-      print "${CHGRP} " g " " r > f850
-      print "${CHMOD} " m " " r > f860
+      print "${CHOWN_DIR} " u " " r > f840
+      print "${CHGRP_DIR} " g " " r > f850
+      print "${CHMOD_DIR} " m " " r > f860
     } else if ( "f" == $3 ) {
       print "${CP" pin "} " b " " r > f810
       print "${TOUCH" pin "} " b " " r > f810
-      print "${CHOWN} " u " " r > f840
-      print "${CHGRP} " g " " r > f850
-      print "${CHMOD} " m " " r > f860
-      if ( 8 <= pin ) {
+      print "${CHOWN" pin "} " u " " r > f840
+      print "${CHGRP" pin "} " g " " r > f850
+      print "${CHMOD" pin "} " m " " r > f860
+      if ( MAXPARALLEL <= pin ) {
         pin = 1
       } else {
         pin = pin + 1
       }
     } else if ( "l" == $3 ) {
       print "${LNSYMB} '" ol "' " r > f820
-      print "${CHOWN} " u " " r > f840
-      print "${CHGRP} " g " " r > f850
+      print "${CHOWN_LNSYMB} " u " " r > f840
+      print "${CHGRP_LNSYMB} " g " " r > f850
     } else if ( "h" == $3 ) {
       print "${LNHARD} " o " " r > f830
     }
@@ -2720,6 +2943,13 @@ if [ ${noRestore} -eq 0 ]; then
       -v f840="${f840Awk}"             \
       -v f850="${f850Awk}"             \
       -v f860="${f860Awk}"             \
+      -v noR800Hdr=${noR800Hdr}        \
+      -v noR810Hdr=${noR810Hdr}        \
+      -v noR820Hdr=${noR820Hdr}        \
+      -v noR830Hdr=${noR830Hdr}        \
+      -v noR840Hdr=${noR840Hdr}        \
+      -v noR850Hdr=${noR850Hdr}        \
+      -v noR860Hdr=${noR860Hdr}        \
       "${f505}"
 
   stop_progress
