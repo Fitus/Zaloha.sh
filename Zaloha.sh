@@ -46,9 +46,11 @@ a much simpler alternative to RSYNC, with key differences:
 
 To detect which files need synchronization, Zaloha compares file sizes and
 modification times. It is clear that such detection is not 100% waterproof.
-A waterproof solution would require comparing file contents, e.g. via an
-MD5 checksum. However, as such comparing would increase the runtime by orders
-of magnitude, it is not implemented.
+A waterproof solution requires comparing file contents, e.g. via "byte by byte"
+comparison or via SHA-256 hashes. However, such comparing would increase the
+runtime by orders of magnitude. Therefore, it is not enabled by default.
+Section Advanced Use of Zaloha describes two alternatives how to enable or
+implement it.
 
 Zaloha asks to confirm actions before they are executed, i.e. prepared actions
 can be skipped, exceptional cases manually resolved, and Zaloha re-run.
@@ -77,7 +79,7 @@ Repository: https://github.com/Fitus/Zaloha.sh
 
 MORE DETAILED DESCRIPTION
 
-The operation of Zaloha can be partitioned into four steps, in that following
+The operation of Zaloha can be partitioned into five steps, in that following
 actions are performed:
 
 Exec1:  unavoidable removals from <backupDir> (objects of conflicting types
@@ -129,15 +131,23 @@ REMOVE.!  remove file from <backupDir> which is newer than the
 REMOVE.x  remove other object on <backupDir> that occupies needed namespace,
           x = object type (l/p/s/c/b/D)
 
+Exec5:  updates resulting from optional "byte by byte" comparing of files
+        (optional feature, can be activated via the "--byteByByte" option)
+-----------------------------------
+UPDATE.b  update file on <backupDir> because it is not identical byte by byte
+unl.UP.b  unlink file on <backupDir> + UPDATE.b (can be switched off via the
+          "--noUnlink" option, see below)
+
 (internal use, for completion only)
 -----------------------------------
 OK        object without needed action on <sourceDir> (either files or
           directories already synchronized with <backupDir>, or other objects
           not to be synchronized to <backupDir>). These records are necessary
           for preparation of shellscripts for the case of restore.
+OK.b      file proven identical byte by byte (in CSV metadata file 555)
 KEEP      object to be kept only on <backupDir>
-uRMDIR    unavoidable RMDIR which goes into Exec1 (in files 380 and 390)
-uREMOVE   unavoidable REMOVE which goes into Exec1 (in files 380 and 390)
+uRMDIR    unavoidable RMDIR which goes into Exec1 (in CSV files 380 and 390)
+uREMOVE   unavoidable REMOVE which goes into Exec1 (in CSV files 380 and 390)
 
 INDIVIDUAL STEPS IN FULL DETAIL
 
@@ -260,6 +270,22 @@ to prepare a rename script (more generally speaking: a migration script) and
 apply it to both <sourceDir> and <backupDir>, instead of letting Zaloha perform
 massive copying followed by massive removing.
 
+Exec5:
+------
+
+Zaloha updates files on <backupDir> for which the optional "byte by byte"
+comparing revealed that they are in fact not identical (despite appearing
+identical by looking at their sizes and modification times).
+
+Action codes are UPDATE.b and unl.UP.b (the latter is update with prior
+unlinking of multiply linked target file, as described under Exec2).
+
+Please note that these actions might indicate deeper problems like storage
+corruption (or even spoofing attempts), and should be actually perceived
+as surprises.
+
+This step is optional and can be activated via the "--byteByByte" option.
+
 Metadata directory of Zaloha
 ----------------------------
 Zaloha creates a metadata directory: <backupDir>/.Zaloha_metadata. The location
@@ -271,7 +297,7 @@ Briefly, they are:
  * AWK program files (produced from "here documents" in Zaloha)
  * Shellscripts to run FIND commands
  * CSV metadata files
- * Exec1/2/3/4 shellscripts
+ * Exec1/2/3/4/5 shellscripts
  * Shellscripts for the case of restore
  * Touchfile marking execution of actions
 
@@ -430,6 +456,14 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
                     exactly +/- 3600 seconds (explained in Special Cases section
                     below)
 
+--byteByByte    ... compare "byte by byte" files that appear identical (more
+                    precisely, files for which no action (OK) or just update of
+                    attributes (ATTR) has been prepared).
+                    (Explained in the Advanced Use of Zaloha section below).
+                    This comparison might be dramatically slower than other
+                    steps. If additional updates of files result from this
+                    comparison, they will be executed in step Exec5.
+
 --noUnlink      ... never unlink multiply linked files on <backupDir> before
                     writing to them
 
@@ -488,6 +522,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --noExec2Hdr    ... do not write header to the shellscript for Exec2 (file 620)
 --noExec3Hdr    ... do not write header to the shellscript for Exec3 (file 630)
 --noExec4Hdr    ... do not write header to the shellscript for Exec4 (file 640)
+--noExec5Hdr    ... do not write header to the shellscript for Exec5 (file 650)
    These options can be used only together with the "--noExec" option.
    (Explained in the Advanced Use of Zaloha section below).
 
@@ -595,6 +630,7 @@ The process which invokes Zaloha in automatic regime should function as follows
     execute script 620_exec2.sh
     execute script 630_exec3.sh
     execute script 640_exec4.sh
+    execute script 650_exec5.sh
     monitor execution (writing to stderr)
     if ( execution successful ) then
       execute script 690_touch.sh
@@ -656,6 +692,9 @@ Corner case REV.UP + "--hLinks": If hardlink detection on <sourceDir> is active
 ("--hLinks" option), then Zaloha supports reverse-update of only the first link
 on <sourceDir> (the one that stays tagged as "file" (f) in CSV metadata
 after AWKHLINKS).
+
+Corner case update of attributes + hardlinked file: Updating attributes on a
+multiply linked (hardlinked) file may lead to follow-up effects.
 
 Corner case if directory .Zaloha_metadata exists under <sourceDir> as well
 (e.g. in case of backups of backups): It will be ignored. If a backup of that
@@ -734,12 +773,12 @@ Talking further in database developer's language: The data model of all CSV
 metadata files is the same and is described in form of comments in AWKPARSER.
 Files 310 and 320 do not qualify as tables, as their fields and records are
 broken by eventual tabs and newlines in filenames. In files 330 through 370,
-field 2 is the Source/Backup indicator. In files 380 through 540, field 2 is
+field 2 is the Source/Backup indicator. In files 380 through 555, field 2 is
 the Action Code.
 
 The natural primary key in files 330 through 360 is the file's path (column 13).
 In files 370 through 505, the natural primary key is combined column 13 with
-column 2. In files 510 through 540, the natural primary key is again
+column 2. In files 510 through 555, the natural primary key is again
 column 13 alone.
 
 The combined primary key in file 505 is obvious e.g. in the case of other object
@@ -749,7 +788,7 @@ file's path (column 13).
 
 ###########################################################
 
-TECHNIQUES FOR HANDLING OF WEIRD CHARACTERS IN FILENAMES
+TECHNIQUES USED BY ZALOHA TO HANDLE WEIRD CHARACTERS IN FILENAMES
 
 Handling of "weird" characters in filenames was a special focus during
 development of Zaloha. Actually, it was an exercise of how far can be gone with
@@ -827,7 +866,7 @@ Zaloha contains several options to handle situations when <sourceDir> and/or
 <backupDir> are not available locally. In the extreme case, Zaloha can be used
 as a mere "difference engine" by a wrapper script, which obtains the inputs
 (FIND data from <sourceDir> and/or <backupDir>) remotely, and also applies the
-outputs (= executes the Exec1/2/3/4 scripts) remotely.
+outputs (= executes the Exec1/2/3/4/5 scripts) remotely.
 
 First useful option is "--noDirChecks": This switches off the checks for local
 existence of <sourceDir> and <backupDir>.
@@ -850,10 +889,10 @@ slow. Running the FINDs directly on the respective file servers in SSH sessions
 should be much quicker.
 
 If <sourceDir> or <backupDir> are not available locally, the "--noExec" option
-must be used to prevent execution of the Exec1/2/3/4 scripts by Zaloha itself.
+must be used to prevent execution of the Exec1/2/3/4/5 scripts by Zaloha itself.
 
-Last set of useful options are "--noExec1Hdr" through "--noExec4Hdr". They
-instruct Zaloha to produce header-less Exec1/2/3/4 scripts (i.e. bodies only).
+Last set of useful options are "--noExec1Hdr" through "--noExec5Hdr". They
+instruct Zaloha to produce header-less Exec1/2/3/4/5 scripts (i.e. bodies only).
 The headers normally contain definitions used in the bodies of the scripts.
 Header-less scripts can be easily used with alternative headers that contain
 different definitions. This gives much flexibility:
@@ -904,6 +943,33 @@ Exec1 and Exec4: use the same recipe, except that the one script which removes
 the directories must run last, of course, not first.
 
 ###########################################################
+
+ADVANCED USE OF ZALOHA - COMPARING CONTENTS OF FILES
+
+First, let's make it clear that comparing contents of files will increase the
+runtime dramatically, because instead of reading just the directory data to
+obtain file sizes and modification times, the files themselves must be read.
+
+ALTERNATIVE 1: option "--byteByByte" (suitable if both filesystems are local)
+
+Option "--byteByByte" forces Zaloha to compare "byte by byte" files that appear
+identical (more precisely, files for which no action (OK) or just update of
+attributes (ATTR) has been prepared). If additional updates of files result from
+this comparison, they will be executed in step Exec5.
+
+ALTERNATIVE 2: overload the file size field (CSV column 4) with SHA-256 hash
+
+The idea is: Zaloha does not compare file sizes numerically, but as strings.
+Also, appending semicolon (";") and the SHA-256 hash to the file size field
+achieves exactly what is needed: If the file size is identical but the SHA-256
+hash differs, Zaloha will detect that the file needs synchronization.
+
+There is an almost 100% security that files are identical if they have equal
+sizes and SHA-256 hashes. An implementation requires use of the "--noFindSource"
+and "--noFindBackup" options with own mechanism of (local or remote) preparation
+of CSV metadata files 310 and 320 with column 4 overloaded as described.
+
+###########################################################
 ZALOHADOCU
 }
 
@@ -938,7 +1004,7 @@ f390Base="390_diff_r_post.csv"       # differences result reverse sorted for pos
 
 f405Base="405_select23.awk"          # AWK program for selection of Exec2 and Exec3 actions
 f410Base="410_exec1.awk"             # AWK program for preparation of shellscripts for Exec1 and Exec4
-f420Base="420_exec2.awk"             # AWK program for preparation of shellscript for Exec2
+f420Base="420_exec2.awk"             # AWK program for preparation of shellscripts for Exec2 and Exec5
 f430Base="430_exec3.awk"             # AWK program for preparation of shellscript for Exec3
 f490Base="490_touch.awk"             # AWK program for preparation of shellscript to touch file 999_mark_executed
 
@@ -948,11 +1014,14 @@ f510Base="510_exec1.csv"             # Exec1 actions (reverse sorted)
 f520Base="520_exec2.csv"             # Exec2 actions
 f530Base="530_exec3.csv"             # Exec3 actions
 f540Base="540_exec4.csv"             # Exec4 actions (reverse sorted)
+f550Base="550_exec5.csv"             # Exec5 actions
+f555Base="555_byte_by_byte.csv"      # result of byte by byte comparing of files that appear identical
 
 f610Base="610_exec1.sh"              # shellscript for Exec1
 f620Base="620_exec2.sh"              # shellscript for Exec2
 f630Base="630_exec3.sh"              # shellscript for Exec3
 f640Base="640_exec4.sh"              # shellscript for Exec4
+f650Base="650_exec5.sh"              # shellscript for Exec5
 f690Base="690_touch.sh"              # shellscript to touch file 999_mark_executed
 
 f700Base="700_restore.awk"           # AWK program for preparation of shellscripts for the case of restore
@@ -981,13 +1050,36 @@ trap 'error_exit "Error on line ${LINENO}"' ERR
 
 function start_progress {
   if [ ${noProgress} -eq 0 ]; then
-    echo -n "    ${1} ${DOTS60:1:$(( 53 - ${#1} ))} "
+    echo -n "    ${1} ${DOTS60:1:$(( 53 - ${#1} ))}"
+    progressCurrColNo=58
+  fi
+}
+
+function start_progress_by_chars {
+  if [ ${noProgress} -eq 0 ]; then
+    echo -n "    ${1} "
+    (( progressCurrColNo = ${#1} + 5 ))
+  fi
+}
+
+function progress_char {
+  if [ ${noProgress} -eq 0 ]; then
+    if [ ${progressCurrColNo} -ge 80 ]; then
+      echo -ne "\n    "
+      progressCurrColNo=4
+    fi
+    echo -n "${1}"
+    (( progressCurrColNo++ ))
   fi
 }
 
 function stop_progress {
   if [ ${noProgress} -eq 0 ]; then
-    echo "done."
+    if [ ${progressCurrColNo} -gt 58 ]; then
+      echo -ne "\n    "
+      progressCurrColNo=4
+    fi
+    echo "${BLANKS60:1:$(( 58 - ${progressCurrColNo} ))} done."
   fi
 }
 
@@ -1003,32 +1095,36 @@ function optim_csv_after_use {
   fi
 }
 
+function echo_args_with_ifs {
+  echo "${*}"
+}
+
 TAB=$'\t'
 NLINE=$'\n'
-BSLASHPATTERN="\\\\"
-DQUOTEPATTERN="\\\""
-DQUOTE="\""
-ASTERISKPATTERN="\\*"
-ASTERISK="*"
-QUESTIONMARKPATTERN="\\?"
-QUESTIONMARK="?"
-LBRACKETPATTERN="\\["
-LBRACKET="["
-RBRACKETPATTERN="\\]"
-RBRACKET="]"
-CNTRLPATTERN="[[:cntrl:]]"
-TRIPLETDSEP="///d/"  # placeholder in FIND patterns for <sourceDir> or <backupDir> followed by directory separator
-TRIPLETT="///t"      # escape for tab
-TRIPLETN="///n"      # escape for newline
-TRIPLETB="///b"      # escape for backslash
-TRIPLETC="///c"      # display of control characters on terminal
-TRIPLET="///"        # escape sequence, leading field, terminator field
+BSLASHPATTERN='\\'
+DQUOTEPATTERN='\"'
+DQUOTE='"'
+ASTERISKPATTERN='\*'
+ASTERISK='*'
+QUESTIONMARKPATTERN='\?'
+QUESTIONMARK='?'
+LBRACKETPATTERN='\['
+LBRACKET='['
+RBRACKETPATTERN='\]'
+RBRACKET=']'
+CNTRLPATTERN='[[:cntrl:]]'
+TRIPLETDSEP='///d/'  # placeholder in FIND patterns for <sourceDir> or <backupDir> followed by directory separator
+TRIPLETT='///t'      # escape for tab
+TRIPLETN='///n'      # escape for newline
+TRIPLETB='///b'      # escape for backslash
+TRIPLETC='///c'      # display of control characters on terminal
+TRIPLET='///'        # escape sequence, leading field, terminator field
 
 FSTAB=$'\t'
-TERMNORM=$'\033'"[0m"
-TERMBLUE=$'\033'"[94m"
-DOTS10=".........."
-DOTS60="${DOTS10}${DOTS10}${DOTS10}${DOTS10}${DOTS10}${DOTS10}"
+TERMNORM=$'\033''[0m'
+TERMBLUE=$'\033''[94m'
+printf -v BLANKS60 '%60s' ' '
+DOTS60="${BLANKS60// /.}"
 
 ###########################################################
 sourceDir=
@@ -1041,6 +1137,7 @@ revNew=0
 revUp=0
 hLinks=0
 ok3600s=0
+byteByByte=0
 noUnlink=0
 touch=0
 pUser=0
@@ -1059,6 +1156,7 @@ noExec1Hdr=0
 noExec2Hdr=0
 noExec3Hdr=0
 noExec4Hdr=0
+noExec5Hdr=0
 noR800Hdr=0
 noR810Hdr=0
 noR820Hdr=0
@@ -1084,6 +1182,7 @@ do
     --revUp)             revUp=1 ;;
     --hLinks)            hLinks=1 ;;
     --ok3600s)           ok3600s=1 ;;
+    --byteByByte)        byteByByte=1 ;;
     --noUnlink)          noUnlink=1 ;;
     --touch)             touch=1 ;;
     --pUser)             pUser=1 ;;
@@ -1102,6 +1201,7 @@ do
     --noExec2Hdr)        noExec2Hdr=1 ;;
     --noExec3Hdr)        noExec3Hdr=1 ;;
     --noExec4Hdr)        noExec4Hdr=1 ;;
+    --noExec5Hdr)        noExec5Hdr=1 ;;
     --noR800Hdr)         noR800Hdr=1 ;;
     --noR810Hdr)         noR810Hdr=1 ;;
     --noR820Hdr)         noR820Hdr=1 ;;
@@ -1133,6 +1233,9 @@ if [ ${noExec3Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
 fi
 if [ ${noExec4Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
   error_exit "Option --noExec4Hdr can be used only together with option --noExec"
+fi
+if [ ${noExec5Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
+  error_exit "Option --noExec5Hdr can be used only together with option --noExec"
 fi
 
 awkLint=
@@ -1313,10 +1416,13 @@ f510="${metaDir}${f510Base}"
 f520="${metaDir}${f520Base}"
 f530="${metaDir}${f530Base}"
 f540="${metaDir}${f540Base}"
+f550="${metaDir}${f550Base}"
+f555="${metaDir}${f555Base}"
 f610="${metaDir}${f610Base}"
 f620="${metaDir}${f620Base}"
 f630="${metaDir}${f630Base}"
 f640="${metaDir}${f640Base}"
+f650="${metaDir}${f650Base}"
 f690="${metaDir}${f690Base}"
 f700="${metaDir}${f700Base}"
 f800="${metaDir}${f800Base}"
@@ -1367,6 +1473,7 @@ ${TRIPLET}${FSTAB}revNew${FSTAB}${revNew}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}revUp${FSTAB}${revUp}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}hLinks${FSTAB}${hLinks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}ok3600s${FSTAB}${ok3600s}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}byteByByte${FSTAB}${byteByByte}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noUnlink${FSTAB}${noUnlink}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}touch${FSTAB}${touch}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}pUser${FSTAB}${pUser}${FSTAB}${TRIPLET}
@@ -1389,6 +1496,7 @@ ${TRIPLET}${FSTAB}noExec1Hdr${FSTAB}${noExec1Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec2Hdr${FSTAB}${noExec2Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec3Hdr${FSTAB}${noExec3Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec4Hdr${FSTAB}${noExec4Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noExec5Hdr${FSTAB}${noExec5Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR800Hdr${FSTAB}${noR800Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR810Hdr${FSTAB}${noR810Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR820Hdr${FSTAB}${noR820Hdr}${FSTAB}${TRIPLET}
@@ -1796,8 +1904,8 @@ BEGIN {
   if ( $3 !~ /[dflpscbD]/ ) {
     error_exit( "Unexpected, column 3 of cleaned file contains invalid value" )
   }
-  if ( $4 !~ NUMBERREGEX ) {
-    error_exit( "Unexpected, column 4 of cleaned file is not numeric" )
+  if ( $4 !~ /^[0123456789]+(;.*)?$/ ) {
+    error_exit( "Unexpected, column 4 (till eventual ;) of cleaned file is not numeric" )
   }
   if ( $5 !~ NUMBERREGEX ) {
     error_exit( "Unexpected, column 5 of cleaned file is not numeric" )
@@ -1953,10 +2061,16 @@ BEGIN {
   sb = ""
 }
 function print_previous( acode ) {
-  print TRIPLET, acode, tp, sz, tm, ft, dv, id, nh, us, gr, md, pt, TRIPLET, ol, TRIPLET
+  print TRIPLET, acode, tp, sz, tm, ft, dv, id,    ";" nh, us, gr, md, pt, TRIPLET, ol, TRIPLET
+}
+function print_prev_curr( acode ) {
+  print TRIPLET, acode, tp, sz, tm, ft, dv, id, $9 ";" nh, us, gr, md, pt, TRIPLET, ol, TRIPLET
 }
 function print_current( acode ) {
-  print TRIPLET, acode, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, TRIPLET, $15, TRIPLET
+  print TRIPLET, acode, $3, $4, $5, $6, $7, $8, $9 ";"   , $10, $11, $12, $13, TRIPLET, $15, TRIPLET
+}
+function print_curr_prev( acode ) {
+  print TRIPLET, acode, $3, $4, $5, $6, $7, $8, $9 ";" nh, $10, $11, $12, $13, TRIPLET, $15, TRIPLET
 }
 function remove( unavoidable ) {
   if ( "d" == tp ) {
@@ -1995,33 +2109,33 @@ function update_file() {
     bac = "UPDATE"
   }
   if (( 0 != lru ) && ( lru < tm )) {
-    print_current( bac ".!" )
+    print_curr_prev( bac ".!" )
   } else if ( 1 == ok3600s ) {
     if ( tdi <= 3601 ) {
-      print_current( bac ".?" )
+      print_curr_prev( bac ".?" )
     } else {
-      print_current( bac )
+      print_curr_prev( bac )
     }
   } else {
     if ( tdi <= 1 ) {
-      print_current( bac ".?" )
+      print_curr_prev( bac ".?" )
     } else {
-      print_current( bac )
+      print_curr_prev( bac )
     }
   }
 }
 function rev_up_file() {
   if ( 1 == ok3600s ) {
     if (( 0 != lru ) && ( lru < 3600 + $5 )) {
-      print_previous( "REV.UP.!" )
+      print_prev_curr( "REV.UP.!" )
     } else {
-      print_previous( "REV.UP" )
+      print_prev_curr( "REV.UP" )
     }
   } else {
     if (( 0 != lru ) && ( lru < $5 )) {
-      print_previous( "REV.UP.!" )
+      print_prev_curr( "REV.UP.!" )
     } else {
-      print_previous( "REV.UP" )
+      print_prev_curr( "REV.UP" )
     }
   }
 }
@@ -2037,9 +2151,9 @@ function attributes_or_ok() {
     atr = atr "m"
   }
   if ( "" != atr ) {
-    print_current( "ATTR:" atr )
+    print_curr_prev( "ATTR:" atr )
   } else {
-    print_current( "OK" )
+    print_curr_prev( "OK" )
   }
 }
 function process_previous_record() {
@@ -2226,7 +2340,9 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, f510 )
   gsub( TRIPLETBREGEX, BSLASH, f540 )
   printf "" > f510
-  printf "" > f540
+  if ( 0 == noRemove ) {
+    printf "" > f540
+  }
   lrn = ""    # path of last file to REV.NEW
   lkp = ""    # path of last object to KEEP only on <backupDir>
 }
@@ -2265,7 +2381,9 @@ BEGIN {
   }
 }
 END {
-  close( f540 )
+  if ( 0 == noRemove ) {
+    close( f540 )
+  }
   close( f510 )
 }
 AWKPOSTPROC
@@ -2278,13 +2396,24 @@ optim_csv_after_use "${f380}"
 
 stop_progress
 
-start_progress "Post-processing and splitting off Exec1 and Exec4"
+if [ ${noRemove} -eq 0 ]; then
 
-awk ${awkLint}            \
-    -f "${f190}"          \
-    -v f510="${f510Awk}"  \
-    -v f540="${f540Awk}"  \
-    "${f390}"             > "${f500}"
+  start_progress "Post-processing and splitting off Exec1 and Exec4"
+
+else
+
+  start_progress "Post-processing and splitting off Exec1"
+
+  file_not_prepared "${f540}"
+
+fi
+
+awk ${awkLint}               \
+    -f "${f190}"             \
+    -v f510="${f510Awk}"     \
+    -v f540="${f540Awk}"     \
+    -v noRemove=${noRemove}  \
+    "${f390}"                > "${f500}"
 
 optim_csv_after_use "${f390}"
 
@@ -2298,7 +2427,9 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, f520 )
   gsub( TRIPLETBREGEX, BSLASH, f530 )
   printf "" > f520
-  printf "" > f530
+  if (( 1 == revNew ) || ( 1 == revUp )) {
+    printf "" > f530
+  }
 }
 {
   if ( "" != $13 ) {
@@ -2313,21 +2444,92 @@ BEGIN {
   print
 }
 END {
-  close( f530 )
+  if (( 1 == revNew ) || ( 1 == revUp )) {
+    close( f530 )
+  }
   close( f520 )
 }
 AWKSELECT23
 
-start_progress "Sorting (4) and selecting Exec2 and Exec3"
+if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
+
+  start_progress "Sorting (4) and selecting Exec2 and Exec3"
+
+else
+
+  start_progress "Sorting (4) and selecting Exec2"
+
+  file_not_prepared "${f530}"
+
+fi
 
 LC_ALL=C sort -t "${FSTAB}" -k13,13 -k2,2 "${f500}" | awk ${awkLint} \
     -f "${f405}"          \
     -v f520="${f520Awk}"  \
-    -v f530="${f530Awk}"  > "${f505}"
+    -v f530="${f530Awk}"  \
+    -v revNew=${revNew}   \
+    -v revUp=${revUp}     > "${f505}"
 
 optim_csv_after_use "${f500}"
 
 stop_progress
+
+###########################################################
+
+if [ ${byteByByte} -eq 1 ]; then
+
+  start_progress_by_chars "Byte by byte comparing files that appear identical"
+
+  exec {fd550}> "${f550}"
+  exec {fd555}> "${f555}"
+
+  while IFS="${FSTAB}" read -r -a tmpRec   # split record to array (hint: first field has index 0)
+  do
+    if [ "${tmpRec[2]}" == "f" ]; then
+      if [ "${tmpRec[1]}" == "OK" ] || [ "${tmpRec[1]:0:4}" == "ATTR" ]; then
+
+        tmpVal="${tmpRec[12]}"    # file's path with <sourceDir> or <backupDir> stripped
+        tmpVal="${tmpVal//${TRIPLETN}/${NLINE}}"
+        tmpVal="${tmpVal//${TRIPLETT}/${TAB}}"
+
+        cmp -s "${sourceDir}${tmpVal}" "${backupDir}${tmpVal}" && tmpVal=$? || tmpVal=$?
+
+        if [ ${tmpVal} -eq 0 ]; then
+          tmpRec[1]="OK.b"
+          progress_char "."
+
+        elif [ ${tmpVal} -eq 1 ]; then
+
+          tmpVal="${tmpRec[8]}"   # number of hardlinks <sourceDir> ; number of hardlinks <backupDir>
+
+          if [ ${noUnlink} -eq 0 ] && [ ${tmpVal#*;} -ne 1 ]; then
+            tmpRec[1]="unl.UP.b"
+          else
+            tmpRec[1]="UPDATE.b"
+          fi
+          IFS="${FSTAB}" echo_args_with_ifs "${tmpRec[@]}" >&${fd550}
+          progress_char "#"
+
+        else
+          error_exit "command CMP failed while comparing files byte by byte"
+        fi
+
+        IFS="${FSTAB}" echo_args_with_ifs "${tmpRec[@]}" >&${fd555}
+      fi
+    fi
+  done < "${f505}"
+
+  exec {fd555}>&-
+  exec {fd550}>&-
+
+  stop_progress
+
+else
+
+  file_not_prepared "${f550}"
+  file_not_prepared "${f555}"
+
+fi
 
 ###########################################################
 awk ${awkLint} -f "${f100}" << 'AWKEXEC1' > "${f410}"
@@ -2568,7 +2770,7 @@ BEGIN {
     print "backupDir='" backupDir "'"
     print "function rev_exists_err {"
     print "  { set +x; } > /dev/null"
-    print "  echo \"Zaloha: Object exists on <sourceDir> (masked by <findSourceOps> ?): $1\" >&2"
+    print "  echo \"Zaloha: Object exists on <sourceDir> (masked by <findSourceOps> ?): ${1}\" >&2"
     if ( 0 == noExec ) {
       print "  exit 1"
     }
@@ -2724,7 +2926,7 @@ else
 
   file_not_prepared "${f630}"
 
-  if [ -s "${f530}" ]; then
+  if [ -e "${f530}" ]; then
     error_exit "Unexpected, REV actions prepared although neither --revNew nor --revUp options given"
   fi
 
@@ -2749,8 +2951,39 @@ else
 
   file_not_prepared "${f640}"
 
-  if [ -s "${f540}" ]; then
+  if [ -e "${f540}" ]; then
     error_exit "Unexpected, avoidable removals prepared although --noRemove option given"
+  fi
+
+fi
+
+###########################################################
+
+if [ ${byteByByte} -eq 1 ]; then
+
+  start_progress "Preparing shellscript for Exec5"
+
+  awk ${awkLint}                      \
+      -f "${f420}"                    \
+      -v sourceDir="${sourceDirAwk}"  \
+      -v backupDir="${backupDirAwk}"  \
+      -v noExec=${noExec}             \
+      -v noUnlink=${noUnlink}         \
+      -v touch=${touch}               \
+      -v pUser=${pUser}               \
+      -v pGroup=${pGroup}             \
+      -v pMode=${pMode}               \
+      -v noExecHdr=${noExec5Hdr}      \
+      "${f550}"                       > "${f650}"
+
+  stop_progress
+
+else
+
+  file_not_prepared "${f650}"
+
+  if [ -e "${f550}" ]; then
+    error_exit "Unexpected, copies resulting from byte by byte comparing prepared although --byteByByte option not given"
   fi
 
 fi
@@ -2968,6 +3201,8 @@ fi
 
 ###########################################################
 
+# now all preparations are done, start executing ...
+
 if [ ${noExec} -eq 1 ]; then
   exit 0
 fi
@@ -3042,6 +3277,25 @@ if [ ${noRemove} -eq 0 ]; then
     if [ "Y" == "${tmpVal/y/Y}" ]; then
       echo
       bash "${f640}" | awk ${awkLint} -f "${f102}" -v color=${color}
+    else
+      error_exit "User requested Zaloha to abort"
+    fi
+  fi
+fi
+
+if [ ${byteByByte} -eq 1 ]; then
+  echo
+  echo "FROM BYTE BY BYTE COMPARING: TO BE COPIED TO ${backupDirTerm}"
+  echo "==========================================="
+
+  awk ${awkLint} -f "${f104}" -v color=${color} "${f550}"
+
+  if [ -s "${f550}" ]; then
+    echo
+    read -p "Execute above listed copies to ${backupDirTerm} ? [Y/y=Yes, other=do nothing and abort]: " tmpVal
+    if [ "Y" == "${tmpVal/y/Y}" ]; then
+      echo
+      bash "${f650}" | awk ${awkLint} -f "${f102}" -v color=${color}
     else
       error_exit "User requested Zaloha to abort"
     fi
