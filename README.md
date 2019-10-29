@@ -8,8 +8,11 @@ Zaloha is a shellscript for synchronization of files and directories. It is a mu
  * Both directories must be available locally (local HDD/SSD, flash drive, mounted Samba or NFS volume).
  * Zaloha does not lock files while copying them. No writing on either directory may occur while Zaloha runs.
  * Zaloha always copies whole files (not parts of files like RSYNC). This is, however, fully sufficient in many situations.
- * Zaloha has optional reverse-synchronization features (details in docu).
- * Zaloha prepares scripts for case of eventual restore (details in docu).
+ * Zaloha has optional reverse-synchronization features.
+ * Zaloha can optionally compare files byte by byte.
+ * Zaloha prepares scripts for case of eventual restore.
+
+Full documentation is available both [online](DOCUMENTATION.md) as well as inside of Zaloha.sh.
 
 On Linux/Unics, Zaloha runs natively. On Windows, Cygwin is needed.
 
@@ -20,7 +23,7 @@ Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" [other options, se
 ```
 
 ## Usage Screenshot
-![Simple_Demo_screenshot](https://github.com/Fitus/Zaloha.sh/raw/master/Simple_Demo_screenshot.png)
+![Simple_Demo_screenshot](Simple_Demo_screenshot.png)
 
 ## License
 MIT License

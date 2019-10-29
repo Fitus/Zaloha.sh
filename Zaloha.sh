@@ -149,6 +149,7 @@ KEEP      object to be kept only on <backupDir>
 uRMDIR    unavoidable RMDIR which goes into Exec1 (in CSV files 380 and 390)
 uREMOVE   unavoidable REMOVE which goes into Exec1 (in CSV files 380 and 390)
 
+
 INDIVIDUAL STEPS IN FULL DETAIL
 
 Exec1:
@@ -252,7 +253,6 @@ Do not use it in automatic operations.
 
 Exec4:
 ------
-
 Zaloha removes all remaining obsolete files and directories from <backupDir>.
 This function can be switched off via the "--noRemove" option.
 
@@ -272,7 +272,6 @@ massive copying followed by massive removing.
 
 Exec5:
 ------
-
 Zaloha updates files on <backupDir> for which the optional "byte by byte"
 comparing revealed that they are in fact not identical (despite appearing
 identical by looking at their sizes and modification times).
@@ -600,7 +599,6 @@ the recovery scripts prepared by Zaloha.
 
 Automatic operations
 --------------------
-
 Additional care must be taken when using Zaloha in automatic operations
 ("--noExec" option):
 
@@ -668,32 +666,32 @@ option) to use subsequent touch commands instead, which is a more robust
 solution. In the scripts for case of restore, touch commands are used
 unconditionally.
 
-Corner case REV.NEW + namespace on <sourceDir> needed for REV.MKDI or REV.NEW
+Corner case REV.NEW with namespace on <sourceDir> needed for REV.MKDI or REV.NEW
 action is occupied by object of conflicting type: The file on <backupDir>
 will not be reverse-copied to <sourceDir>, but removed. As this file must be
 newer than the last run of Zaloha, the action will be REMOVE.!.
 
-Corner case REV.NEW + <findSourceOps>: If the same file exists on both
+Corner case REV.NEW with "--findSourceOps": If the same file exists on both
 <sourceDir> and <backupDir>, and on <sourceDir> that file is masked by
 <findSourceOps> and on <backupDir> that file is newer than the last run of
 Zaloha, REV.NEW on that file will be prepared. This is an error which Zaloha
 is unable to detect. Hence, the shellscript for Exec3 contains a test that
 throws an error in such situation.
 
-Corner case REV.UP + "--ok3600s": The "--ok3600s" option makes it harder
+Corner case REV.UP with "--ok3600s": The "--ok3600s" option makes it harder
 to determine which file is newer (decision UPDATE vs REV.UP). The implemented
 solution for that case is that for REV.UP, the <backupDir> file must be newer
 by more than 3601 seconds.
 
-Corner case REV.UP + hardlinked file: Reverse-updating a multiply linked
+Corner case REV.UP with hardlinked file: Reverse-updating a multiply linked
 (hardlinked) file on <sourceDir> may lead to follow-up effects.
 
-Corner case REV.UP + "--hLinks": If hardlink detection on <sourceDir> is active
-("--hLinks" option), then Zaloha supports reverse-update of only the first link
-on <sourceDir> (the one that stays tagged as "file" (f) in CSV metadata
-after AWKHLINKS).
+Corner case REV.UP with "--hLinks": If hardlink detection on <sourceDir> is
+active ("--hLinks" option), then Zaloha supports reverse-update of only the
+first link on <sourceDir> (the one that stays tagged as "file" (f) in
+CSV metadata after AWKHLINKS).
 
-Corner case update of attributes + hardlinked file: Updating attributes on a
+Corner case update of attributes with hardlinked file: Updating attributes on a
 multiply linked (hardlinked) file may lead to follow-up effects.
 
 Corner case if directory .Zaloha_metadata exists under <sourceDir> as well
