@@ -511,6 +511,14 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --noDirChecks   ... switch off the checks for existence of <sourceDir> and
     <backupDir>. (Explained in the Advanced Use of Zaloha section below).
 
+--noLastRun     ... do not obtain information about the last run of Zaloha by
+                    running FIND on file 999 in Zaloha metadata directory.
+                    This makes Zaloha state-less, which might be a desired
+                    property in certain situations. However, it sacrifices
+                    features based on the last run of Zaloha: REV.NEW and
+                    distinction of operations on files newer than the last run
+                    of Zaloha (e.g. distinction between UPDATE.! and UPDATE).
+
 --noFindSource  ... do not run FIND (script 210) to search <sourceDir>
                     and use externally supplied CSV metadata file 310 instead
 --noFindBackup  ... do not run FIND (script 220) to search <backupDir>
@@ -1148,6 +1156,7 @@ noRestore=0
 optimCSV=0
 metaDir=
 noDirChecks=0
+noLastRun=0
 noFindSource=0
 noFindBackup=0
 noExec1Hdr=0
@@ -1193,6 +1202,7 @@ do
     --optimCSV)          optimCSV=1 ;;
     --metaDir=*)         metaDir="M${tmpVal#*=}" ;;
     --noDirChecks)       noDirChecks=1 ;;
+    --noLastRun)         noLastRun=1 ;;
     --noFindSource)      noFindSource=1 ;;
     --noFindBackup)      noFindBackup=1 ;;
     --noExec1Hdr)        noExec1Hdr=1 ;;
@@ -1220,6 +1230,9 @@ if [ ${help} -eq 1 ]; then
   exit 0
 fi
 
+if [ ${revNew} -eq 1 ] && [ ${noLastRun} -eq 1 ]; then
+  error_exit "Option --revNew may not be used if option --noLastRun is given"
+fi
 if [ ${noExec1Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
   error_exit "Option --noExec1Hdr can be used only together with option --noExec"
 fi
@@ -1488,6 +1501,7 @@ ${TRIPLET}${FSTAB}metaDirPattAwk${FSTAB}${metaDirPattAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirDefault${FSTAB}${metaDirDefault}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirEsc${FSTAB}${metaDirEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noDirChecks${FSTAB}${noDirChecks}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noLastRun${FSTAB}${noLastRun}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindSource${FSTAB}${noFindSource}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindBackup${FSTAB}${noFindBackup}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec1Hdr${FSTAB}${noExec1Hdr}${FSTAB}${TRIPLET}
@@ -1747,7 +1761,19 @@ awk ${awkLint}                              \
 
 stop_progress
 
-bash "${f200}" | awk ${awkLint} -f "${f102}" -v color=${color}
+if [ ${noLastRun} -eq 0 ]; then
+
+  bash "${f200}" | awk ${awkLint} -f "${f102}" -v color=${color}
+
+  fLastRun="${f300}"
+
+else
+
+  file_not_prepared "${f300}"
+
+  fLastRun="/dev/null"
+
+fi
 
 if [ ${noFindSource} -eq 0 ]; then
 
@@ -1952,7 +1978,7 @@ AWKCHECKER
 
 start_progress "Checking"
 
-awk ${awkLint} -f "${f130}" "${f300}" "${f330}" "${f340}"
+awk ${awkLint} -f "${f130}" "${fLastRun}" "${f330}" "${f340}"
 
 stop_progress
 
@@ -2296,7 +2322,7 @@ END {
   if ( 1 == prr ) {
     process_previous_record()
   }
-  if ( 0 == lru ) {
+  if (( 0 == noLastRun ) && ( 0 == lru )) {
     warning( "No last run of Zaloha found (this is OK if this is the first run)" )
   }
 }
@@ -2314,17 +2340,18 @@ stop_progress
 
 start_progress "Differences processing"
 
-awk ${awkLint}               \
-    -f "${f170}"             \
-    -v noRemove=${noRemove}  \
-    -v revNew=${revNew}      \
-    -v revUp=${revUp}        \
-    -v ok3600s=${ok3600s}    \
-    -v noUnlink=${noUnlink}  \
-    -v pUser=${pUser}        \
-    -v pGroup=${pGroup}      \
-    -v pMode=${pMode}        \
-    "${f300}" "${f370}"      > "${f380}"
+awk ${awkLint}                 \
+    -f "${f170}"               \
+    -v noRemove=${noRemove}    \
+    -v revNew=${revNew}        \
+    -v revUp=${revUp}          \
+    -v ok3600s=${ok3600s}      \
+    -v noUnlink=${noUnlink}    \
+    -v pUser=${pUser}          \
+    -v pGroup=${pGroup}        \
+    -v pMode=${pMode}          \
+    -v noLastRun=${noLastRun}  \
+    "${fLastRun}" "${f370}"      > "${f380}"
 
 optim_csv_after_use "${f370}"
 

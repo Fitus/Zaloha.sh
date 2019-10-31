@@ -72,7 +72,7 @@ Exec2:  copy files/directories to &lt;backupDir&gt; which exist only on &lt;sour
 <b>UPDATE</b>    regular update file on &lt;backupDir&gt;
 <b>UPDATE.!</b>  update file on &lt;backupDir&gt; which is newer than the last run of Zaloha
 <b>UPDATE.?</b>  update file on &lt;backupDir&gt; by a file on &lt;sourceDir&gt; which is not newer
-          (by more than 1 sec (or 3601 secs if <b>--ok3600s))</b>
+          (by more than 1 sec (or 3601 secs if <b>--ok3600s</b>))
 <b>unl.UP</b>    unlink file on &lt;backupDir&gt; + <b>UPDATE</b> (can be switched off via the
           <b>--noUnlink</b> option, see below)
 <b>unl.UP.!</b>  unlink file on &lt;backupDir&gt; + <b>UPDATE.!</b> (can be switched off via the
@@ -136,20 +136,20 @@ a directory).
 Exec2:
 ------
 Files and directories which exist only on &lt;sourceDir&gt; are copied to &lt;backupDir&gt;
-(action codes <b>NEW</b> and <b>MKDIR).</b>
+(action codes <b>NEW</b> and <b>MKDIR</b>).
 
-Zaloha "updates" the file on &lt;backupDir&gt; (action code <b>UPDATE)</b> if the same file
+Zaloha "updates" the file on &lt;backupDir&gt; (action code <b>UPDATE</b>) if the same file
 exists on both &lt;sourceDir&gt; and &lt;backupDir&gt; and the comparisons of modification
 time and file size indicate the necessity of this "update". If the file on
 &lt;backupDir&gt; is multiply linked (hardlinked), Zaloha removes (unlinks) it first,
 to prevent "updating" a multiply linked file, which could lead to follow-up
-effects (action code <b>unl.UP).</b> This unlinking can be switched off via the
+effects (action code <b>unl.UP</b>). This unlinking can be switched off via the
 <b>--noUnlink</b> option.
 
 If the files differ only in attributes (u=user ownership, g=group ownership,
 m=mode), and attribute synchronization is switched on via the <b>--pUser,</b>
 <b>--pGroup</b> and <b>--pMode</b> options, then only these attributes will be
-synchronized (action code <b>ATTR).</b> However, this is an optional feature, because:
+synchronized (action code <b>ATTR</b>). However, this is an optional feature, because:
 (1) the filesystem of &lt;backupDir&gt; might not be capable of storing these
 attributes, or (2) it may be wanted that all files and directories on
 &lt;backupDir&gt; are owned by the user who runs Zaloha.
@@ -204,13 +204,13 @@ conflict between the work on the notebook and the work on the server).
 
 <b>REV.NEW:</b> If a standalone file on &lt;backupDir&gt; is newer than the last run of
 Zaloha, and the <b>--revNew</b> option is given, then that file will be
-reverse-copied to &lt;sourceDir&gt; <b>(REV.NEW)</b> including all necessary parent
-directories <b>(REV.MKDI).</b>
+reverse-copied to &lt;sourceDir&gt; (<b>REV.NEW</b>) including all necessary parent
+directories (<b>REV.MKDI</b>).
 
 <b>REV.UP:</b> If the same file exists on both &lt;sourceDir&gt; and &lt;backupDir&gt;, and the
 file on &lt;backupDir&gt; is newer, and the <b>--revUp</b> option is given, then that file
 will be used to reverse-update the older file on &lt;sourceDir&gt;
-(action code <b>REV.UP).</b>
+(action code <b>REV.UP</b>).
 
 Optionally, to preserve attributes during the <b>REV.MKDI,</b> <b>REV.NEW</b> and <b>REV.UP</b>
 operations: use options <b>--pRevUser,</b> <b>--pRevGroup</b> and <b>--pRevMode.</b>
@@ -431,8 +431,8 @@ key variables for whole script are defined (and can be adjusted as needed).
                     below)
 
 <b>--byteByByte</b>    ... compare "byte by byte" files that appear identical (more
-                    precisely, files for which no action <b>(OK)</b> or just update of
-                    attributes <b>(ATTR)</b> has been prepared).
+                    precisely, files for which no action (<b>OK</b>) or just update of
+                    attributes (<b>ATTR</b>) has been prepared).
                     (Explained in the Advanced Use of Zaloha section below).
                     This comparison might be dramatically slower than other
                     steps. If additional updates of files result from this
@@ -485,6 +485,14 @@ key variables for whole script are defined (and can be adjusted as needed).
 
 <b>--noDirChecks</b>   ... switch off the checks for existence of &lt;sourceDir&gt; and
     &lt;backupDir&gt;. (Explained in the Advanced Use of Zaloha section below).
+
+<b>--noLastRun</b>     ... do not obtain information about the last run of Zaloha by
+                    running FIND on file 999 in Zaloha metadata directory.
+                    This makes Zaloha state-less, which might be a desired
+                    property in certain situations. However, it sacrifices
+                    features based on the last run of Zaloha: <b>REV.NEW</b> and
+                    distinction of operations on files newer than the last run
+                    of Zaloha (e.g. distinction between <b>UPDATE.!</b> and <b>UPDATE</b>).
 
 <b>--noFindSource</b>  ... do not run FIND (script 210) to search &lt;sourceDir&gt;
                     and use externally supplied CSV metadata file 310 instead
@@ -576,7 +584,7 @@ the recovery scripts prepared by Zaloha.
 Automatic operations
 --------------------
 Additional care must be taken when using Zaloha in automatic operations
-<b>(--noExec</b> option):
+(<b>--noExec</b> option):
 
 Exit status and standard error of Zaloha and of the scripts prepared by Zaloha
 must be monitored by a monitoring system used within your IT landscape.
@@ -656,7 +664,7 @@ is unable to detect. Hence, the shellscript for Exec3 contains a test that
 throws an error in such situation.
 
 Corner case <b>REV.UP</b> with <b>--ok3600s:</b> The <b>--ok3600s</b> option makes it harder
-to determine which file is newer (decision <b>UPDATE</b> vs <b>REV.UP).</b> The implemented
+to determine which file is newer (decision <b>UPDATE</b> vs <b>REV.UP</b>). The implemented
 solution for that case is that for <b>REV.UP,</b> the &lt;backupDir&gt; file must be newer
 by more than 3601 seconds.
 
@@ -664,7 +672,7 @@ Corner case <b>REV.UP</b> with hardlinked file: Reverse-updating a multiply link
 (hardlinked) file on &lt;sourceDir&gt; may lead to follow-up effects.
 
 Corner case <b>REV.UP</b> with <b>--hLinks:</b> If hardlink detection on &lt;sourceDir&gt; is
-active <b>(--hLinks</b> option), then Zaloha supports reverse-update of only the
+active (<b>--hLinks</b> option), then Zaloha supports reverse-update of only the
 first link on &lt;sourceDir&gt; (the one that stays tagged as "file" (f) in
 CSV metadata after AWKHLINKS).
 
@@ -933,8 +941,8 @@ obtain file sizes and modification times, the files themselves must be read.
 ALTERNATIVE 1: option <b>--byteByByte</b> (suitable if both filesystems are local)
 
 Option <b>--byteByByte</b> forces Zaloha to compare "byte by byte" files that appear
-identical (more precisely, files for which no action <b>(OK)</b> or just update of
-attributes <b>(ATTR)</b> has been prepared). If additional updates of files result from
+identical (more precisely, files for which no action (<b>OK</b>) or just update of
+attributes (<b>ATTR</b>) has been prepared). If additional updates of files result from
 this comparison, they will be executed in step Exec5.
 
 ALTERNATIVE 2: overload the file size field (CSV column 4) with SHA-256 hash
