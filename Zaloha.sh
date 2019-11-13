@@ -42,6 +42,7 @@ a much simpler alternative to RSYNC, with key differences:
  * Zaloha always copies whole files (not parts of files like RSYNC). This is,
    however, fully sufficient in many situations.
  * Zaloha has optional reverse-synchronization features (details below).
+ * Zaloha can optionally compare files byte by byte (details below).
  * Zaloha prepares scripts for case of eventual restore (details below).
 
 To detect which files need synchronization, Zaloha compares file sizes and
@@ -59,7 +60,7 @@ and to not execute the actions (but still prepare the scripts).
 
 <sourceDir> and <backupDir> can be on different filesystem types if the
 filesystem limitations are not hit. Such limitations are (e.g. in case of
-ext4 -> FAT32): not allowed characters in filenames, filename uppercase
+ext4 -> FAT): not allowed characters in filenames, filename uppercase
 conversions, file size limits, etc.
 
 No writing on either directory may occur while Zaloha runs (no file locking is
@@ -100,7 +101,8 @@ NEW       regular create new file on <backupDir>
 UPDATE    regular update file on <backupDir>
 UPDATE.!  update file on <backupDir> which is newer than the last run of Zaloha
 UPDATE.?  update file on <backupDir> by a file on <sourceDir> which is not newer
-          (by more than 1 sec (or 3601 secs if "--ok3600s"))
+          (or not newer by 3600 secs if option "--ok3600s" is given plus
+           eventual 1 sec FAT tolerance)
 unl.UP    unlink file on <backupDir> + UPDATE (can be switched off via the
           "--noUnlink" option, see below)
 unl.UP.!  unlink file on <backupDir> + UPDATE.! (can be switched off via the
@@ -119,7 +121,8 @@ REV.NEW   reverse-create file on <sourceDir> (if a standalone file on
 REV.UP    reverse-update file on <sourceDir> (if the file on <backupDir>
           is newer than the file on <sourceDir>)
 REV.UP.!  reverse-update file on <sourceDir> which is newer
-          than the last run of Zaloha
+          than the last run of Zaloha (or newer than the last run of Zaloha
+          minus 3600 secs if option "--ok3600s" is given)
 
 Exec4:  remaining removals of obsolete files/directories from <backupDir>
         (can be optionally switched off via the "--noRemove" option)
@@ -159,14 +162,16 @@ needed namespace). This must be the first step, because objects of conflicting
 types on <backupDir> would prevent synchronization (e.g. a file cannot overwrite
 a directory).
 
+Unavoidable removals are prepared regardless of the "--noRemove" option.
+
 Exec2:
 ------
 Files and directories which exist only on <sourceDir> are copied to <backupDir>
 (action codes NEW and MKDIR).
 
 Zaloha "updates" the file on <backupDir> (action code UPDATE) if the same file
-exists on both <sourceDir> and <backupDir> and the comparisons of modification
-time and file size indicate the necessity of this "update". If the file on
+exists on both <sourceDir> and <backupDir> and the comparisons of file size and
+modification time indicate the necessity of this "update". If the file on
 <backupDir> is multiply linked (hardlinked), Zaloha removes (unlinks) it first,
 to prevent "updating" a multiply linked file, which could lead to follow-up
 effects (action code unl.UP). This unlinking can be switched off via the
@@ -229,14 +234,12 @@ back to the Windows notebook (<sourceDir>) (of course, assumed that there is no
 conflict between the work on the notebook and the work on the server).
 
 REV.NEW: If a standalone file on <backupDir> is newer than the last run of
-Zaloha, and the "--revNew" option is given, then that file will be
-reverse-copied to <sourceDir> (REV.NEW) including all necessary parent
-directories (REV.MKDI).
+Zaloha, and the "--revNew" option is given, then Zaloha reverse-copies that file
+to <sourceDir> (REV.NEW) including all necessary parent directories (REV.MKDI).
 
 REV.UP: If the same file exists on both <sourceDir> and <backupDir>, and the
-file on <backupDir> is newer, and the "--revUp" option is given, then that file
-will be used to reverse-update the older file on <sourceDir>
-(action code REV.UP).
+file on <backupDir> is newer, and the "--revUp" option is given, then Zaloha
+uses that file to reverse-update the older file on <sourceDir> (REV.UP).
 
 Optionally, to preserve attributes during the REV.MKDI, REV.NEW and REV.UP
 operations: use options "--pRevUser", "--pRevGroup" and "--pRevMode".
@@ -257,12 +260,13 @@ Zaloha removes all remaining obsolete files and directories from <backupDir>.
 This function can be switched off via the "--noRemove" option.
 
 Why are removals from <backupDir> split into two steps (Exec1 and Exec4)?
-Imagine a scenario when a directory is renamed on <sourceDir>: If all removals
-were concentrated in Exec1, then <backupDir> would transition through a state
-(namely between Exec1 and Exec2) when the backup copy of the directory is
-already removed (under the old name), but not yet created (under the new name).
-To prevent such transient states, the removals (except the unavoidable ones)
-are postponed to Exec4.
+The unavoidable removals must unconditionally occur first, also in Exec1 step.
+But what about the remaining (avoidable) removals: Imagine a scenario when a
+directory is renamed on <sourceDir>: If all removals were executed in Exec1,
+then <backupDir> would transition through a state (namely between Exec1 and
+Exec2) when the backup copy of the directory is already removed (under the old
+name), but not yet created (under the new name). To minimize the chance for such
+transient states to occur, the avoidable removals are postponed to Exec4.
 
 Advise to this topic: In case of bigger reorganizations of <sourceDir>, also
 e.g. in case when a directory with large content is renamed, it is much better
@@ -274,7 +278,7 @@ Exec5:
 ------
 Zaloha updates files on <backupDir> for which the optional "byte by byte"
 comparing revealed that they are in fact not identical (despite appearing
-identical by looking at their sizes and modification times).
+identical by looking at their file sizes and modification times).
 
 Action codes are UPDATE.b and unl.UP.b (the latter is update with prior
 unlinking of multiply linked target file, as described under Exec2).
@@ -298,7 +302,7 @@ Briefly, they are:
  * CSV metadata files
  * Exec1/2/3/4/5 shellscripts
  * Shellscripts for the case of restore
- * Touchfile marking execution of actions
+ * Touchfile 999 marking execution of actions
 
 Files persist in the metadata directory until the next invocation of Zaloha.
 
@@ -329,9 +333,9 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --backupDir=<backupDir> is mandatory. <backupDir> must exist, otherwise Zaloha
     throws an error (except when the "--noDirChecks" option is given).
 
---findSourceOps=<findSourceOps> are additional operands for FIND command that
-    searches <sourceDir>, to be used to exclude files or subdirectories from
-    synchronization, based on file path or file name patterns:
+--findSourceOps=<findSourceOps> are additional operands for the FIND command
+    that searches <sourceDir>, to be used to exclude files or subdirectories
+    from synchronization, based on file path or file name patterns:
 
       -path <file path pattern> -prune -o
       -name <file name pattern> -prune -o
@@ -345,7 +349,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     Zaloha internally combines <findSourceOps> with <findGeneralOps> and with
     own operands, and all of them follow this convention. If an earlier
     expression in the OR-connected chain evaluates TRUE, FIND does not evaluate
-    following operands, leading to no output being produced. 
+    following operands, leading to no output being produced.
 
     <findSourceOps> applies only to <sourceDir>. If a file on <sourceDir> is
     excluded by <findSourceOps> and the same file exists on <backupDir>,
@@ -412,7 +416,8 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     is used, unless, perhaps, the <sourceDir> and <backupDir> parts of the paths
     are matched by a wildcard.
 
-    Beware of matching <sourceDir> or <backupDir> themselves by the patterns.
+    Beware of matching the top-level directories <sourceDir> or <backupDir>
+    themselves by the patterns.
 
     To extend (= combine, not replace) the internally defined <findGeneralOps>
     with own extension, pass in own extension prepended by the plus sign ("+").
@@ -431,7 +436,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 
 --noRemove      ... do not remove files and directories which exist only
     on <backupDir>. This option is useful in situations like that <sourceDir>
-    holds only "current" files but <backupDir> should hold "current" plus
+    holds only "current" files but <backupDir> holds "current" plus
     "historical" files.
 
     Please keep in mind that if objects of conflicting types on <backupDir>
@@ -451,17 +456,23 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --hLinks        ... perform hardlink detection (inode-deduplication)
                     on <sourceDir>
 
---ok3600s       ... additional tolerance for modification time differences of
-                    exactly +/- 3600 seconds (explained in Special Cases section
-                    below)
+--ok1s          ... tolerate +/- 1 second differences due to FAT rounding of
+                    modification times to nearest 2 seconds (explained in
+                    Special Cases section below). This option is necessary only
+                    if Zaloha is unable to determine the FAT file system from
+                    the FIND output (column 6).
+
+--ok3600s       ... additional tolerable offset of modification time differences
+                    of exactly +/- 3600 seconds (explained in Special Cases
+                    section below)
 
 --byteByByte    ... compare "byte by byte" files that appear identical (more
                     precisely, files for which no action (OK) or just update of
                     attributes (ATTR) has been prepared).
                     (Explained in the Advanced Use of Zaloha section below).
-                    This comparison might be dramatically slower than other
-                    steps. If additional updates of files result from this
-                    comparison, they will be executed in step Exec5.
+                    This comparison might dramatically slow down Zaloha.
+                    If additional updates of files result from this comparison,
+                    they will be executed in step Exec5.
 
 --noUnlink      ... never unlink multiply linked files on <backupDir> before
                     writing to them
@@ -511,8 +522,8 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --noDirChecks   ... switch off the checks for existence of <sourceDir> and
     <backupDir>. (Explained in the Advanced Use of Zaloha section below).
 
---noLastRun     ... do not obtain information about the last run of Zaloha by
-                    running FIND on file 999 in Zaloha metadata directory.
+--noLastRun     ... do not obtain time of the last run of Zaloha by running
+                    FIND on file 999 in Zaloha metadata directory.
                     This makes Zaloha state-less, which might be a desired
                     property in certain situations. However, it sacrifices
                     features based on the last run of Zaloha: REV.NEW and
@@ -649,19 +660,30 @@ SPECIAL AND CORNER CASES
 
 To detect which files need synchronization, Zaloha compares file sizes and
 modification times. If the file sizes differ, synchronization is needed.
-The modification time is more tricky: Zaloha tolerates +/- 1 second differences,
-due to FAT32 rounding to the nearest 2 seconds. In some situations, it is
-necessary to tolerate differences of exactly +/- 1 hour (+/- 3600 seconds)
-as well (to be activated via the "--ok3600s" option). Typically, this occurs
-when one of the directories is on a filesystem type that stores modification
-times not in universal time but in local time (e.g. FAT32), and the OS is
-not able, for some reason, to correctly reflect the switching of
-daylight saving time while converting the local time.
+The modification time is more tricky:
 
-The +/- 1 hour differences, tolerable via the "--ok3600s" option, are assumed
-to exist between <sourceDir> and <backupDir>, but not between <backupDir>
-and <metaDir>. This is relevant especially if <metaDir> is located outside of
-<backupDir> (via the "--metaDir" option).
+ * If one of the filesystems is FAT (i.e. FAT16, VFAT, FAT32), Zaloha tolerates
+   differences of +/- 1 second. This is necessary because FAT rounds the
+   modification times to nearest 2 seconds, while no such rounding occurs on
+   other filesystems.
+
+ * If Zaloha is unable to determine the FAT file system from the FIND output
+   (column 6), it is possible to enforce the +/- 1 second tolerance via the
+   "--ok1s" option.
+
+ * In some situations, offsets of exactly +/- 1 hour (+/- 3600 seconds)
+   must be tolerated as well. Typically, this is necessary when one of the
+   directories is on a filesystem type that stores modification times
+   in local time instead of in universal time (e.g. FAT), and the OS is not
+   able, for some reason, to correctly adjust for daylight saving time while
+   converting the local time.
+
+ * The additional tolerable offsets of +/- 3600 seconds can be activated via the
+   "--ok3600s" option. They are assumed to exist between files on <sourceDir>
+   and files on <backupDir>, but not between files on <backupDir> and the
+   999 file in <metaDir> (from which the time of the last run of Zaloha is
+   obtained). This last note is relevant especially if <metaDir> is located
+   outside of <backupDir> (which is achievable via the "--metaDir" option).
 
 It is possible (but not recommended) for <backupDir> to be a subdirectory of
 <sourceDir> and vice versa. In such cases, conditions to avoid recursive copying
@@ -675,7 +697,7 @@ solution. In the scripts for case of restore, touch commands are used
 unconditionally.
 
 Corner case REV.NEW with namespace on <sourceDir> needed for REV.MKDI or REV.NEW
-action is occupied by object of conflicting type: The file on <backupDir>
+actions is occupied by object of conflicting type: The file on <backupDir>
 will not be reverse-copied to <sourceDir>, but removed. As this file must be
 newer than the last run of Zaloha, the action will be REMOVE.!.
 
@@ -689,7 +711,7 @@ throws an error in such situation.
 Corner case REV.UP with "--ok3600s": The "--ok3600s" option makes it harder
 to determine which file is newer (decision UPDATE vs REV.UP). The implemented
 solution for that case is that for REV.UP, the <backupDir> file must be newer
-by more than 3601 seconds.
+by more than 3600 seconds (plus eventual 1 sec FAT tolerance).
 
 Corner case REV.UP with hardlinked file: Reverse-updating a multiply linked
 (hardlinked) file on <sourceDir> may lead to follow-up effects.
@@ -698,6 +720,12 @@ Corner case REV.UP with "--hLinks": If hardlink detection on <sourceDir> is
 active ("--hLinks" option), then Zaloha supports reverse-update of only the
 first link on <sourceDir> (the one that stays tagged as "file" (f) in
 CSV metadata after AWKHLINKS).
+
+Corner case "--hLinks" with files on <backupDir> under same paths as the
+seconds, third etc. hardlinks on <sourceDir> (the ones that will be tagged as
+"hardlinks" (h) in CSV metadata after AWKHLINKS): The files on <backupDir> will
+be removed (or kept if "--noRemove" option is given). See case 8 in AWKDIFF
+(other object on <sourceDir>, file on <backupDir>).
 
 Corner case update of attributes with hardlinked file: Updating attributes on a
 multiply linked (hardlinked) file may lead to follow-up effects.
@@ -918,7 +946,7 @@ First, let's clarify when parallel operations do not make sense: When copying
 files locally, even one single process will probably fully utilize the available
 bus capacity. In such cases, copying files in parallel does not make sense.
 
-Contrary to this, imagine what happens when a process copies a small file over
+On the contrary, imagine what happens when a process copies a small file over
 a network with high latency: sending out the small file takes microseconds,
 but waiting for the network round-trip to finish takes milliseconds. Also, the
 process is idle most of the time, and the network capacity is under-utilized.
@@ -959,9 +987,9 @@ obtain file sizes and modification times, the files themselves must be read.
 ALTERNATIVE 1: option "--byteByByte" (suitable if both filesystems are local)
 
 Option "--byteByByte" forces Zaloha to compare "byte by byte" files that appear
-identical (more precisely, files for which no action (OK) or just update of
-attributes (ATTR) has been prepared). If additional updates of files result from
-this comparison, they will be executed in step Exec5.
+identical (more precisely, files for which either no action (OK) or just update
+of attributes (ATTR) has been prepared). If additional updates of files result
+from this comparison, they will be executed in step Exec5.
 
 ALTERNATIVE 2: overload the file size field (CSV column 4) with SHA-256 hash
 
@@ -1142,6 +1170,7 @@ noRemove=0
 revNew=0
 revUp=0
 hLinks=0
+ok1s=0
 ok3600s=0
 byteByByte=0
 noUnlink=0
@@ -1188,6 +1217,7 @@ do
     --revNew)            revNew=1 ;;
     --revUp)             revUp=1 ;;
     --hLinks)            hLinks=1 ;;
+    --ok1s)              ok1s=1 ;;
     --ok3600s)           ok3600s=1 ;;
     --byteByByte)        byteByByte=1 ;;
     --noUnlink)          noUnlink=1 ;;
@@ -1483,6 +1513,7 @@ ${TRIPLET}${FSTAB}noRemove${FSTAB}${noRemove}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}revNew${FSTAB}${revNew}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}revUp${FSTAB}${revUp}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}hLinks${FSTAB}${hLinks}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}ok1s${FSTAB}${ok1s}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}ok3600s${FSTAB}${ok3600s}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}byteByByte${FSTAB}${byteByByte}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noUnlink${FSTAB}${noUnlink}${FSTAB}${TRIPLET}
@@ -1578,6 +1609,7 @@ BEGIN {
   gsub( /NUMBERREGEX/, "/^[0123456789]+$/" )
   gsub( /ZEROREGEX/, "/^0+$/" )
   gsub( /CNTRLREGEX/, "/[[:cntrl:]]/" )
+  gsub( /FATREGEX/, "/[Ff][Aa][Tt]/" )
   gsub( /TERMNORM/, "\"\\033[0m\"" )
   gsub( /TERMRED/, "\"\\033[91m\"" )
   gsub( /TERMBLUE/, "\"\\033[94m\"" )
@@ -2082,7 +2114,19 @@ BEGIN {
   xrn = ""    # occupied namespace for REV.NEW
   xkp = ""    # occupied namespace for objects to KEEP only on <backupDir>
   prr = 0     # flag previous record remembered (= unprocessed)
+  if ( 1 == ok3600s ) {
+    tof = 3600     # tolerated offset +/- 3600 seconds
+  } else {
+    tof = 0
+  }
   sb = ""
+}
+function get_tolerance() {
+  if (( ft ~ FATREGEX ) || ( $6 ~ FATREGEX ) || ( 1 == ok1s )) {
+    tol = 1        # additional tolerance +/- 1 second due to FAT rounding to nearest 2 seconds
+  } else {
+    tol = 0
+  }
 }
 function print_previous( acode ) {
   print TRIPLET, acode, tp, sz, tm, ft, dv, id,    ";" nh, us, gr, md, pt, TRIPLET, ol, TRIPLET
@@ -2134,14 +2178,8 @@ function update_file() {
   }
   if (( 0 != lru ) && ( lru < tm )) {
     print_curr_prev( bac ".!" )
-  } else if ( 1 == ok3600s ) {
-    if ( tdi <= 3601 ) {
-      print_curr_prev( bac ".?" )
-    } else {
-      print_curr_prev( bac )
-    }
   } else {
-    if ( tdi <= 1 ) {
+    if ( tdi <= tof + tol ) {
       print_curr_prev( bac ".?" )
     } else {
       print_curr_prev( bac )
@@ -2149,18 +2187,10 @@ function update_file() {
   }
 }
 function rev_up_file() {
-  if ( 1 == ok3600s ) {
-    if (( 0 != lru ) && ( lru < 3600 + $5 )) {
-      print_prev_curr( "REV.UP.!" )
-    } else {
-      print_prev_curr( "REV.UP" )
-    }
+  if (( 0 != lru ) && ( lru < tof + $5 )) {
+    print_prev_curr( "REV.UP.!" )
   } else {
-    if (( 0 != lru ) && ( lru < $5 )) {
-      print_prev_curr( "REV.UP.!" )
-    } else {
-      print_prev_curr( "REV.UP" )
-    }
+    print_prev_curr( "REV.UP" )
   }
 }
 function attributes_or_ok() {
@@ -2249,32 +2279,28 @@ function process_previous_record() {
                 if ( tda < 0 ) {
                   tda = - tda
                 }
-                if ( 1 == tda ) {
-                  oka = 1
-                } else if (( 1 == ok3600s ) && ( 3599 <= tda ) && ( tda <= 3601 )) {
-                  oka = 1
-                } else if ( 0 == tda ) {
+                if ( 0 == tda ) {
                   error_exit( "Unexpected, numeric overflow occurred" )
                 }
+                get_tolerance()
+                if ( tda <= tol ) {
+                  oka = 1
+                } else if (( 0 != tof ) && ( tof - tol <= tda ) && ( tda <= tof + tol )) {
+                  oka = 1
+                }
               }
+            } else {
+              tdi = $5 - tm
+              get_tolerance()
             }
             if ( 1 == oka ) {
               attributes_or_ok()
             } else {
-              tdi = $5 - tm
               if ( 1 == revUp ) {
-                if ( 1 == ok3600s ) {
-                  if ( tdi < -3601 ) {
-                    rev_up_file()
-                  } else {
-                    update_file()
-                  }
+                if ( tdi < - tof - tol ) {
+                  rev_up_file()
                 } else {
-                  if ( tdi < -1 ) {
-                    rev_up_file()
-                  } else {
-                    update_file()
-                  }
+                  update_file()
                 }
               } else {
                 update_file()
@@ -2345,6 +2371,7 @@ awk ${awkLint}                 \
     -v noRemove=${noRemove}    \
     -v revNew=${revNew}        \
     -v revUp=${revUp}          \
+    -v ok1s=${ok1s}            \
     -v ok3600s=${ok3600s}      \
     -v noUnlink=${noUnlink}    \
     -v pUser=${pUser}          \
