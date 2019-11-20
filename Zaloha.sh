@@ -246,9 +246,8 @@ operations: use options "--pRevUser", "--pRevGroup" and "--pRevMode".
 
 If reverse-synchronization is not active: If no "--revNew" option is given,
 then each standalone file on <backupDir> is considered obsolete (and removed,
-unless the "--noRemove" option is given).
-If no "--revUp" option is given, then files on <sourceDir> always update files
-on <backupDir> if they differ.
+unless the "--noRemove" option is given). If no "--revUp" option is given, then
+files on <sourceDir> always update files on <backupDir> if they differ.
 
 Reverse-synchronization to <sourceDir> increases the overall complexity of the
 solution. Use it only in the interactive regime of Zaloha, where human oversight
