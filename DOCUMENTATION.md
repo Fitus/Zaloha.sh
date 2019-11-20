@@ -219,7 +219,8 @@ Optionally, to preserve attributes during the <b>REV.MKDI,</b> <b>REV.NEW</b> an
 operations: use options <b>--pRevUser,</b> <b>--pRevGroup</b> and <b>--pRevMode.</b>
 
 If reverse-synchronization is not active: If no <b>--revNew</b> option is given,
-then each standalone file on &lt;backupDir&gt; is considered obsolete (and removed).
+then each standalone file on &lt;backupDir&gt; is considered obsolete (and removed,
+unless the <b>--noRemove</b> option is given).
 If no <b>--revUp</b> option is given, then files on &lt;sourceDir&gt; always update files
 on &lt;backupDir&gt; if they differ.
 
@@ -287,6 +288,15 @@ CSV outputs of the FIND commands (before AWKCLEANER) and the produced
 shellscripts, because due to eventual newlines in filenames, they may contain
 multiple lines per "record".
 
+In some situations, the existence of Zaloha metadata directory is unwanted after
+Zaloha finishes. In such cases, put a command to remove it to the wrapper script
+that invokes Zaloha. At the same time, use the option <b>--noLastRun</b> to prevent
+Zaloha from running FIND on file 999 in Zaloha metadata directory (to obtain
+time of the last run of Zaloha). Please note that by not keeping the Zaloha
+metadata directory, you sacrifice some functionality (see <b>--noLastRun</b> option
+below), and you loose the CSV metadata for an eventual analysis of problems and
+you loose the shellscripts for case of restore.
+
 Shellscripts for case of restore
 --------------------------------
 Zaloha prepares shellscripts for the case of restore in its metadata directory
@@ -328,8 +338,10 @@ key variables for whole script are defined (and can be adjusted as needed).
 
     &lt;findSourceOps&gt; applies only to &lt;sourceDir&gt;. If a file on &lt;sourceDir&gt; is
     excluded by &lt;findSourceOps&gt; and the same file exists on &lt;backupDir&gt;,
-    then Zaloha evaluates the file on &lt;backupDir&gt; as obsolete (= removes it).
-    Compare this with &lt;findGeneralOps&gt; (see below).
+    then Zaloha evaluates the file on &lt;backupDir&gt; as obsolete (= removes it,
+    unless the <b>--noRemove</b> option is given, or eventually even tries to
+    reverse-synchronize it, which leads to one of the corner cases (see below)).
+    Compare this with &lt;findGeneralOps&gt; (the next option).
 
     Although &lt;findSourceOps&gt; consists of multiple words, it is passed in as
     a single string (= enclose it in double-quotes or single-quotes in your
@@ -348,9 +360,9 @@ key variables for whole script are defined (and can be adjusted as needed).
 
     If the expression with the "-path" test is used, the placeholder ///d/
     should be used in place of &lt;sourceDir&gt;/. Zaloha will replace ///d/ by
-    &lt;sourceDir&gt;/ in the form that is passed to FIND, and with eventual FIND
-    pattern special characters properly escaped (which relieves you from doing
-    the same by yourself).
+    &lt;sourceDir&gt;/ in the form that is passed to FIND as start point directory,
+    and with eventual FIND pattern special characters properly escaped
+    (which relieves you from doing the same by yourself).
 
     Examples: * exclude &lt;sourceDir&gt;/.git,
               * exclude all files or subdirectories Windows Security
@@ -471,12 +483,12 @@ key variables for whole script are defined (and can be adjusted as needed).
 <b>--pRevMode</b>      ... preserve modes (permission bits) during REV operations
 
 <b>--noRestore</b>     ... do not prepare scripts for the case of restore (= saves
-    processing time and disk space, see optimization remarks below). The scripts
+    processing time and disk space, see optimization note below). The scripts
     for the case of restore can still be produced ex-post by manually running
     the respective AWK program (700 file) on the source CSV file (505 file).
 
 <b>--optimCSV</b>      ... optimize space occupied by CSV metadata files by removing
-    intermediary CSV files after use (see optimization remarks below).
+    intermediary CSV files after use (see optimization note below).
     If intermediary CSV metadata files are removed, an ex-post analysis of
     eventual problems may be impossible.
 
@@ -500,7 +512,8 @@ key variables for whole script are defined (and can be adjusted as needed).
 <b>--noLastRun</b>     ... do not obtain time of the last run of Zaloha by running
                     FIND on file 999 in Zaloha metadata directory.
                     This makes Zaloha state-less, which might be a desired
-                    property in certain situations. However, it sacrifices
+                    property in certain situations, e.g. if you do not want to
+                    keep the Zaloha metadata directory. However, this sacrifices
                     features based on the last run of Zaloha: <b>REV.NEW</b> and
                     distinction of operations on files newer than the last run
                     of Zaloha (e.g. distinction between <b>UPDATE.!</b> and <b>UPDATE</b>).
@@ -528,7 +541,7 @@ key variables for whole script are defined (and can be adjusted as needed).
 <b>--noR860Hdr</b>     ... do not write header to the restore script 860
    (Explained in the Advanced Use of Zaloha section below).
 
-<b>--noProgress</b>    ... suppress progress messages (less screen output)
+<b>--noProgress</b>    ... suppress progress messages (less screen output).
     If both options <b>--noExec</b> and <b>--noProgress</b> are used, Zaloha does not
     produce any output on stdout (traditional behavior of Unics tools).
 
@@ -540,11 +553,11 @@ key variables for whole script are defined (and can be adjusted as needed).
 
 <b>--help</b>          ... show Zaloha documentation (using the LESS program) and exit
 
-Optimization remarks: If Zaloha operates on directories with huge numbers of
-files, especially small ones, then the size of metadata plus the size of scripts
-for the case of restore may exceed the size of the files themselves. If this
-leads to hitting of storage and/or processing time limits, use options
-<b>--noRestore</b> and <b>--optimCSV.</b>
+Optimization note: If Zaloha operates on directories with huge numbers of files,
+especially small ones, then the size of metadata plus the size of scripts for
+the case of restore may exceed the size of the files themselves. If this leads
+to hitting of storage and/or processing time limits, use options <b>--noRestore</b>
+and <b>--optimCSV.</b>
 
 Zaloha must be run by a user with sufficient privileges to read &lt;sourceDir&gt; and
 to write and perform other required actions on &lt;backupDir&gt;. In case of the REV
