@@ -356,9 +356,9 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     expressions are given, they must form an OR-connected chain:
     expressionA -o expressionB -o expressionC -o ... This is required because
     Zaloha internally combines <findSourceOps> with <findGeneralOps> and with
-    own operands, and all of them follow this convention. If an earlier
+    own expressions, and all of them follow this convention. If an earlier
     expression in the OR-connected chain evaluates TRUE, FIND does not evaluate
-    following operands, leading to no output being produced.
+    following expressions, leading to no output being produced.
 
     <findSourceOps> applies only to <sourceDir>. If a file on <sourceDir> is
     excluded by <findSourceOps> and the same file exists on <backupDir>,
@@ -376,7 +376,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     <findSourceOps> itself contains a double quote, use \". Note: to protect
     the backslash and the double-quote from your shell, use \\\".
 
-    Please note that in the patterns of the -path and -name operands, FIND
+    Please note that in the patterns of the -path and -name expressions, FIND
     itself interprets following characters specially (see FIND documentation):
     *, ?, [, ], \. If these characters are to be taken literally, they must be
     backslash-escaped. Again, take care of protecting backslashes from your
@@ -427,7 +427,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     is used, unless, perhaps, the <sourceDir> and <backupDir> parts of the paths
     are matched by a wildcard.
 
-    Beware of matching the top-level directories <sourceDir> or <backupDir>
+    Beware of matching the start point directories <sourceDir> or <backupDir>
     themselves by the patterns.
 
     To extend (= combine, not replace) the internally defined <findGeneralOps>
@@ -525,8 +525,8 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
       c) advanced use of Zaloha, see Advanced Use of Zaloha section below
     It is possible (but not recommended) to place <metaDir> to a different
     location inside of <backupDir>, or inside of <sourceDir>. In such cases,
-    FIND operands to exclude the metadata directory from the FIND searches must
-    be explicitly passed in via <findGeneralOps>.
+    FIND expressions to exclude the metadata directory from the FIND searches
+    must be explicitly passed in via <findGeneralOps>.
     If Zaloha is used to synchronize multiple directories, then each such
     instance of Zaloha must have its own separate metadata directory.
 
@@ -698,8 +698,8 @@ The modification time is more tricky:
    outside of <backupDir> (which is achievable via the "--metaDir" option).
 
 It is possible (but not recommended) for <backupDir> to be a subdirectory of
-<sourceDir> and vice versa. In such cases, conditions to avoid recursive copying
-must be passed in via <findGeneralOps>.
+<sourceDir> and vice versa. In such cases, FIND expressions to avoid recursive
+copying must be passed in via <findGeneralOps>.
 
 In some situations (e.g. Linux Samba + Linux Samba client),
 cp --preserve=timestamps does not preserve modification timestamps (unless on
@@ -966,7 +966,7 @@ In such cases, also typically when many small files are copied over a network,
 running the processes in parallel will speed up the process significantly.
 
 Zaloha provides support for parallel operations of up to 8 parallel processes
-(variable MAXPARALLEL). How to utilize this support:
+(constant MAXPARALLEL). How to utilize this support:
 
 Let's take the Exec2 script as an example (file 620): make 1+8=9 copies of the
 Exec2 script. In the header of the first copy, keep only MKDIR, CHOWN_DIR,
@@ -1669,17 +1669,17 @@ AWKACTIONS2TERM
 awk ${awkLint} -f "${f100}" << 'AWKPARSER' > "${f106}"
 DEFINE_ERROR_EXIT
 BEGIN {
-  gsub( TRIPLETBREGEX, BSLASH, findDir )
+  gsub( TRIPLETBREGEX, BSLASH, startPoint )
   gsub( TRIPLETBREGEX, BSLASH, findOps )
   gsub( TRIPLETBREGEX, BSLASH, tripletDSepV )
   gsub( TRIPLETBREGEX, BSLASH, outFile )
-  gsub( QUOTEREGEX, QUOTEESC, findDir )
+  gsub( QUOTEREGEX, QUOTEESC, startPoint )
   gsub( QUOTEREGEX, QUOTEESC, outFile )
-  cmd = "find '" findDir "'"  # FIND command being constructed
-  wrd = ""                    # word of FIND command being constructed
-  iwd = 0                     # flag inside of word
-  idq = 0                     # flag inside of double-quote
-  bsl = 0                     # flag backslash remembered
+  cmd = "find '" startPoint "'"  # FIND command being constructed
+  wrd = ""                       # word of FIND command being constructed
+  iwd = 0                        # flag inside of word
+  idq = 0                        # flag inside of double-quote
+  bsl = 0                        # flag backslash remembered
   findOps = findOps " "
   for ( i = 1; i <= length( findOps ); i++ ) {
     c = substr( findOps, i, 1 )
@@ -1779,7 +1779,7 @@ start_progress "Parsing"
 awk ${awkLint}                              \
     -f "${f106}"                            \
     -v sourceBackup="L"                     \
-    -v findDir="${metaDirAwk}"              \
+    -v startPoint="${metaDirAwk}"           \
     -v findOps="${findLastRunOpsFinalAwk}"  \
     -v tripletDSepV="${metaDirPattAwk}"     \
     -v outFile="${f300Awk}"                 \
@@ -1788,7 +1788,7 @@ awk ${awkLint}                              \
 awk ${awkLint}                              \
     -f "${f106}"                            \
     -v sourceBackup="S"                     \
-    -v findDir="${sourceDirAwk}"            \
+    -v startPoint="${sourceDirAwk}"         \
     -v findOps="${findSourceOpsFinalAwk}"   \
     -v tripletDSepV="${sourceDirPattAwk}"   \
     -v outFile="${f310Awk}"                 \
@@ -1797,7 +1797,7 @@ awk ${awkLint}                              \
 awk ${awkLint}                              \
     -f "${f106}"                            \
     -v sourceBackup="B"                     \
-    -v findDir="${backupDirAwk}"            \
+    -v startPoint="${backupDirAwk}"         \
     -v findOps="${findBackupOpsFinalAwk}"   \
     -v tripletDSepV="${backupDirPattAwk}"   \
     -v outFile="${f320Awk}"                 \
