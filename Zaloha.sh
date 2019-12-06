@@ -1083,8 +1083,8 @@ f860Base="860_restore_mode.sh"       # for the case of restore: shellscript to r
 f999Base="999_mark_executed"         # empty touchfile marking execution of actions
 
 ###########################################################
-set -e
 set -u
+set -e
 set -o pipefail
 
 function error_exit {
@@ -1585,18 +1585,19 @@ BEGIN {
         "    exit 1\n"                                                      \
         "  }\n"                                                             \
         "}"
-
   war = "function warning( msg ) {\n"                                       \
         "  print \"\\nZaloha AWK: Warning: \" msg > \"/dev/stderr\"\n"      \
         "  close( \"/dev/stderr\" )\n"                                      \
         "}"
+  mpa = 8     # MAXPARALLEL constant
 }
 {
   gsub( /DEFINE_ERROR_EXIT/, eex )
   gsub( /DEFINE_WARNING/, war )
   gsub( /BIN_BASH/, "print \"#!/bin/bash\"" )
+  gsub( /XTRACE_ON/, "print \"BASH_XTRACEFD=1; PS4='    '; set -x\"" )
+  gsub( /XTRACE_OFF/, "print \"  { set +x; } > /dev/null\"" )
   gsub( /SECTION_LINE/, "print \"#\" FSTAB TRIPLET" )
-  gsub( /MAXPARALLEL/, "8" )
   gsub( /TABREGEX/, "/\\t/" )
   gsub( /FSTAB/, "\"\\t\"" )
   gsub( /TAB/, "\"\\t\"" )
@@ -1625,7 +1626,17 @@ BEGIN {
   gsub( /TERMNORM/, "\"\\033[0m\"" )
   gsub( /TERMRED/, "\"\\033[91m\"" )
   gsub( /TERMBLUE/, "\"\\033[94m\"" )
-  print
+  if ( $0 ~ /ONE_TO_MAXPARALLEL/ ) {
+    for ( i = 1; i <= mpa; i++ ) {
+      s = $0
+      gsub( /ONE_TO_MAXPARALLEL/, i, s )
+      gsub( /MAXPARALLEL/, mpa, s )
+      print s
+    }
+  } else {
+    gsub( /MAXPARALLEL/, mpa )
+    print
+  }
 }
 AWKAWKPREPROC
 
@@ -1758,11 +1769,9 @@ BEGIN {
   cmd = cmd "\\t" TRIPLET       # column 16: terminator field
   cmd = cmd "\\n' > '" outFile "'"
   BIN_BASH
-  print "BASH_XTRACEFD=1"
-  print "PS4='    '"
   print "set -e"
   if ( 0 == noProgress ) {
-    print "set -x"
+    XTRACE_ON
   }
   print cmd
 }
@@ -2607,15 +2616,11 @@ BEGIN {
     BIN_BASH
     print "backupDir='" backupDir "'"
     print "RMDIR='rmdir'"
-    for ( i = 1; i <= MAXPARALLEL; i++ ) {
-      print "RM" i "='rm -f'"
-    }
+    print "RM" ONE_TO_MAXPARALLEL "='rm -f'"
     print "set -u"
     if ( 0 == noExec ) {
-      print "BASH_XTRACEFD=1"
-      print "PS4='    '"
       print "set -e"
-      print "set -x"
+      XTRACE_ON
     }
   }
   SECTION_LINE
@@ -2671,46 +2676,30 @@ BEGIN {
     print "backupDir='" backupDir "'"
     print "MKDIR='mkdir'"
     if ( 1 == touch ) {
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CP" i "='cp'"
-      }
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "TOUCH" i "='touch -r'"
-      }
+      print "CP" ONE_TO_MAXPARALLEL "='cp'"
+      print "TOUCH" ONE_TO_MAXPARALLEL "='touch -r'"
     } else {
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CP" i "='cp --preserve=timestamps'"
-      }
+      print "CP" ONE_TO_MAXPARALLEL "='cp --preserve=timestamps'"
     }
     if ( 0 == noUnlink ) {
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "UNLINK" i "='rm -f'"
-      }
+      print "UNLINK" ONE_TO_MAXPARALLEL "='rm -f'"
     }
     if ( 1 == pUser ) {
       print "CHOWN_DIR='chown'"
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CHOWN" i "='chown'"
-      }
+      print "CHOWN" ONE_TO_MAXPARALLEL "='chown'"
     }
     if ( 1 == pGroup ) {
       print "CHGRP_DIR='chgrp'"
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CHGRP" i "='chgrp'"
-      }
+      print "CHGRP" ONE_TO_MAXPARALLEL "='chgrp'"
     }
     if ( 1 == pMode ) {
       print "CHMOD_DIR='chmod'"
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CHMOD" i "='chmod'"
-      }
+      print "CHMOD" ONE_TO_MAXPARALLEL "='chmod'"
     }
     print "set -u"
     if ( 0 == noExec ) {
-      print "BASH_XTRACEFD=1"
-      print "PS4='    '"
       print "set -e"
-      print "set -x"
+      XTRACE_ON
     }
   }
   SECTION_LINE
@@ -2833,7 +2822,7 @@ BEGIN {
     print "sourceDir='" sourceDir "'"
     print "backupDir='" backupDir "'"
     print "function rev_exists_err {"
-    print "  { set +x; } > /dev/null"
+    XTRACE_OFF
     print "  echo \"Zaloha: Object exists on <sourceDir> (masked by <findSourceOps> ?): ${1}\" >&2"
     if ( 0 == noExec ) {
       print "  exit 1"
@@ -2842,48 +2831,30 @@ BEGIN {
     print "TEST_DIR='['"
     print "REV_EXISTS_ERR_DIR='rev_exists_err'"
     print "MKDIR='mkdir'"
-    for ( i = 1; i <= MAXPARALLEL; i++ ) {
-      print "TEST" i "='['"
-    }
-    for ( i = 1; i <= MAXPARALLEL; i++ ) {
-      print "REV_EXISTS_ERR" i "='rev_exists_err'"
-    }
+    print "TEST" ONE_TO_MAXPARALLEL "='['"
+    print "REV_EXISTS_ERR" ONE_TO_MAXPARALLEL "='rev_exists_err'"
     if ( 1 == touch ) {
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CP" i "='cp'"
-      }
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "TOUCH" i "='touch -r'"
-      }
+      print "CP" ONE_TO_MAXPARALLEL "='cp'"
+      print "TOUCH" ONE_TO_MAXPARALLEL "='touch -r'"
     } else {
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CP" i "='cp --preserve=timestamps'"
-      }
+      print "CP" ONE_TO_MAXPARALLEL "='cp --preserve=timestamps'"
     }
     if ( 1 == pRevUser ) {
       print "CHOWN_DIR='chown'"
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CHOWN" i "='chown'"
-      }
+      print "CHOWN" ONE_TO_MAXPARALLEL "='chown'"
     }
     if ( 1 == pRevGroup ) {
       print "CHGRP_DIR='chgrp'"
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CHGRP" i "='chgrp'"
-      }
+      print "CHGRP" ONE_TO_MAXPARALLEL "='chgrp'"
     }
     if ( 1 == pRevMode ) {
       print "CHMOD_DIR='chmod'"
-      for ( i = 1; i <= MAXPARALLEL; i++ ) {
-        print "CHMOD" i "='chmod'"
-      }
+      print "CHMOD" ONE_TO_MAXPARALLEL "='chmod'"
     }
     print "set -u"
     if ( 0 == noExec ) {
-      print "BASH_XTRACEFD=1"
-      print "PS4='    '"
       print "set -e"
-      print "set -x"
+      XTRACE_ON
     }
   }
   SECTION_LINE
@@ -3104,12 +3075,8 @@ BEGIN {
     BIN_BASH > f810
     print "backupDir='" backupDir "'" > f810
     print "restoreDir='" restoreDir "'" > f810
-    for ( i = 1; i <= MAXPARALLEL; i++ ) {
-      print "CP" i "='cp'" > f810
-    }
-    for ( i = 1; i <= MAXPARALLEL; i++ ) {
-      print "TOUCH" i "='touch -r'" > f810
-    }
+    print "CP" ONE_TO_MAXPARALLEL "='cp'" > f810
+    print "TOUCH" ONE_TO_MAXPARALLEL "='touch -r'" > f810
     print "set -u" > f810
   }
   if ( 0 == noR820Hdr ) {
@@ -3128,9 +3095,7 @@ BEGIN {
     BIN_BASH > f840
     print "restoreDir='" restoreDir "'" > f840
     print "CHOWN_DIR='chown'" > f840
-    for ( i = 1; i <= MAXPARALLEL; i++ ) {
-      print "CHOWN" i "='chown'" > f840
-    }
+    print "CHOWN" ONE_TO_MAXPARALLEL "='chown'" > f840
     print "CHOWN_LNSYMB='chown -h'" > f840
     print "set -u" > f840
   }
@@ -3138,9 +3103,7 @@ BEGIN {
     BIN_BASH > f850
     print "restoreDir='" restoreDir "'" > f850
     print "CHGRP_DIR='chgrp'" > f850
-    for ( i = 1; i <= MAXPARALLEL; i++ ) {
-      print "CHGRP" i "='chgrp'" > f850
-    }
+    print "CHGRP" ONE_TO_MAXPARALLEL "='chgrp'" > f850
     print "CHGRP_LNSYMB='chgrp -h'" > f850
     print "set -u" > f850
   }
@@ -3148,9 +3111,7 @@ BEGIN {
     BIN_BASH > f860
     print "restoreDir='" restoreDir "'" > f860
     print "CHMOD_DIR='chmod'" > f860
-    for ( i = 1; i <= MAXPARALLEL; i++ ) {
-      print "CHMOD" i "='chmod'" > f860
-    }
+    print "CHMOD" ONE_TO_MAXPARALLEL "='chmod'" > f860
     print "set -u" > f860
   }
   SECTION_LINE > f800
