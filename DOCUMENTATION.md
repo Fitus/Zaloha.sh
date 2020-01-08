@@ -6,6 +6,7 @@ a much simpler alternative to RSYNC, with key differences:
 
  * Zaloha is a bash shellscript that uses only FIND, SORT and AWK. All you need
    is the Zaloha.sh file. This documentation is contained in Zaloha.sh too.
+ * Cyber-secure: No new binary code, no new open ports, easily reviewable.
  * Both &lt;sourceDir&gt; and &lt;backupDir&gt; must be available locally (local HDD/SSD,
    flash drive, mounted Samba or NFS volume).
  * Zaloha does not lock files while copying them. No writing on either directory
@@ -46,6 +47,11 @@ development of Zaloha (details below).
 On Linux/Unics, Zaloha runs natively. On Windows, Cygwin is needed.
 
 Repository: <a href="https://github.com/Fitus/Zaloha.sh">https://github.com/Fitus/Zaloha.sh</a>
+
+An add-on shellscript to create hardlink-based snapshots of the backup directory
+exists, that allows to create "Time Machine"-like backup solutions:
+
+Repository of add-on shellscript: <a href="https://github.com/Fitus/Zaloha_Snapshot.sh">https://github.com/Fitus/Zaloha_Snapshot.sh</a>
 </pre>
 
 
