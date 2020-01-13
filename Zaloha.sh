@@ -108,7 +108,7 @@ UPDATE    regular update file on <backupDir>
 UPDATE.!  update file on <backupDir> which is newer than the last run of Zaloha
 UPDATE.?  update file on <backupDir> by a file on <sourceDir> which is not newer
           (or not newer by 3600 secs if option "--ok3600s" is given plus
-           eventual 1 sec FAT tolerance)
+           eventual 2 secs FAT tolerance)
 unl.UP    unlink file on <backupDir> + UPDATE (can be switched off via the
           "--noUnlink" option, see below)
 unl.UP.!  unlink file on <backupDir> + UPDATE.! (can be switched off via the
@@ -473,7 +473,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --hLinks        ... perform hardlink detection (inode-deduplication)
                     on <sourceDir>
 
---ok1s          ... tolerate +/- 1 second differences due to FAT rounding of
+--ok2s          ... tolerate +/- 2 seconds differences due to FAT rounding of
                     modification times to nearest 2 seconds (explained in
                     Special Cases section below). This option is necessary only
                     if Zaloha is unable to determine the FAT file system from
@@ -681,13 +681,15 @@ modification times. If the file sizes differ, synchronization is needed.
 The modification time is more tricky:
 
  * If one of the filesystems is FAT (i.e. FAT16, VFAT, FAT32), Zaloha tolerates
-   differences of +/- 1 second. This is necessary because FAT rounds the
+   differences of +/- 2 seconds. This is necessary because FAT rounds the
    modification times to nearest 2 seconds, while no such rounding occurs on
-   other filesystems.
+   other filesystems. (Note: Why is a +/- 1 second tolerance not sufficient:
+   In some situations, a "ceiling" to nearest 2 seconds was observed instead of
+   "rounding", making a +/- 2 seconds tolerance necessary).
 
  * If Zaloha is unable to determine the FAT file system from the FIND output
-   (column 6), it is possible to enforce the +/- 1 second tolerance via the
-   "--ok1s" option.
+   (column 6), it is possible to enforce the +/- 2 seconds tolerance via the
+   "--ok2s" option.
 
  * In some situations, offsets of exactly +/- 1 hour (+/- 3600 seconds)
    must be tolerated as well. Typically, this is necessary when one of the
@@ -729,7 +731,7 @@ throws an error in such situation.
 Corner case REV.UP with "--ok3600s": The "--ok3600s" option makes it harder
 to determine which file is newer (decision UPDATE vs REV.UP). The implemented
 solution for that case is that for REV.UP, the <backupDir> file must be newer
-by more than 3600 seconds (plus eventual 1 sec FAT tolerance).
+by more than 3600 seconds (plus eventual 2 secs FAT tolerance).
 
 Corner case REV.UP with hardlinked file: Reverse-updating a multiply linked
 (hardlinked) file on <sourceDir> may lead to follow-up effects.
@@ -1188,7 +1190,7 @@ noRemove=0
 revNew=0
 revUp=0
 hLinks=0
-ok1s=0
+ok2s=0
 ok3600s=0
 byteByByte=0
 noUnlink=0
@@ -1235,7 +1237,7 @@ do
     --revNew)            revNew=1 ;;
     --revUp)             revUp=1 ;;
     --hLinks)            hLinks=1 ;;
-    --ok1s)              ok1s=1 ;;
+    --ok2s)              ok2s=1 ;;
     --ok3600s)           ok3600s=1 ;;
     --byteByByte)        byteByByte=1 ;;
     --noUnlink)          noUnlink=1 ;;
@@ -1531,7 +1533,7 @@ ${TRIPLET}${FSTAB}noRemove${FSTAB}${noRemove}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}revNew${FSTAB}${revNew}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}revUp${FSTAB}${revUp}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}hLinks${FSTAB}${hLinks}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}ok1s${FSTAB}${ok1s}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}ok2s${FSTAB}${ok2s}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}ok3600s${FSTAB}${ok3600s}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}byteByByte${FSTAB}${byteByByte}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noUnlink${FSTAB}${noUnlink}${FSTAB}${TRIPLET}
@@ -2149,8 +2151,8 @@ BEGIN {
   sb = ""
 }
 function get_tolerance() {
-  if (( ft ~ FATREGEX ) || ( $6 ~ FATREGEX ) || ( 1 == ok1s )) {
-    tol = 1        # additional tolerance +/- 1 second due to FAT rounding to nearest 2 seconds
+  if (( ft ~ FATREGEX ) || ( $6 ~ FATREGEX ) || ( 1 == ok2s )) {
+    tol = 2        # additional tolerance +/- 2 seconds due to FAT rounding to nearest 2 seconds
   } else {
     tol = 0
   }
@@ -2398,7 +2400,7 @@ awk ${awkLint}                 \
     -v noRemove=${noRemove}    \
     -v revNew=${revNew}        \
     -v revUp=${revUp}          \
-    -v ok1s=${ok1s}            \
+    -v ok2s=${ok2s}            \
     -v ok3600s=${ok3600s}      \
     -v noUnlink=${noUnlink}    \
     -v pUser=${pUser}          \

@@ -80,7 +80,7 @@ Exec2:  copy files/directories to &lt;backupDir&gt; which exist only on &lt;sour
 <b>UPDATE.!</b>  update file on &lt;backupDir&gt; which is newer than the last run of Zaloha
 <b>UPDATE.?</b>  update file on &lt;backupDir&gt; by a file on &lt;sourceDir&gt; which is not newer
           (or not newer by 3600 secs if option <b>--ok3600s</b> is given plus
-           eventual 1 sec FAT tolerance)
+           eventual 2 secs FAT tolerance)
 <b>unl.UP</b>    unlink file on &lt;backupDir&gt; + <b>UPDATE</b> (can be switched off via the
           <b>--noUnlink</b> option, see below)
 <b>unl.UP.!</b>  unlink file on &lt;backupDir&gt; + <b>UPDATE.!</b> (can be switched off via the
@@ -448,7 +448,7 @@ key variables for whole script are defined (and can be adjusted as needed).
 <b>--hLinks</b>        ... perform hardlink detection (inode-deduplication)
                     on &lt;sourceDir&gt;
 
-<b>--ok1s</b>          ... tolerate +/- 1 second differences due to FAT rounding of
+<b>--ok2s</b>          ... tolerate +/- 2 seconds differences due to FAT rounding of
                     modification times to nearest 2 seconds (explained in
                     Special Cases section below). This option is necessary only
                     if Zaloha is unable to determine the FAT file system from
@@ -658,13 +658,15 @@ modification times. If the file sizes differ, synchronization is needed.
 The modification time is more tricky:
 
  * If one of the filesystems is FAT (i.e. FAT16, VFAT, FAT32), Zaloha tolerates
-   differences of +/- 1 second. This is necessary because FAT rounds the
+   differences of +/- 2 seconds. This is necessary because FAT rounds the
    modification times to nearest 2 seconds, while no such rounding occurs on
-   other filesystems.
+   other filesystems. (Note: Why is a +/- 1 second tolerance not sufficient:
+   In some situations, a "ceiling" to nearest 2 seconds was observed instead of
+   "rounding", making a +/- 2 seconds tolerance necessary).
 
  * If Zaloha is unable to determine the FAT file system from the FIND output
-   (column 6), it is possible to enforce the +/- 1 second tolerance via the
-   <b>--ok1s</b> option.
+   (column 6), it is possible to enforce the +/- 2 seconds tolerance via the
+   <b>--ok2s</b> option.
 
  * In some situations, offsets of exactly +/- 1 hour (+/- 3600 seconds)
    must be tolerated as well. Typically, this is necessary when one of the
@@ -706,7 +708,7 @@ throws an error in such situation.
 Corner case <b>REV.UP</b> with <b>--ok3600s:</b> The <b>--ok3600s</b> option makes it harder
 to determine which file is newer (decision <b>UPDATE</b> vs <b>REV.UP</b>). The implemented
 solution for that case is that for <b>REV.UP,</b> the &lt;backupDir&gt; file must be newer
-by more than 3600 seconds (plus eventual 1 sec FAT tolerance).
+by more than 3600 seconds (plus eventual 2 secs FAT tolerance).
 
 Corner case <b>REV.UP</b> with hardlinked file: Reverse-updating a multiply linked
 (hardlinked) file on &lt;sourceDir&gt; may lead to follow-up effects.
