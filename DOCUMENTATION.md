@@ -553,6 +553,15 @@ key variables for whole script are defined (and can be adjusted as needed).
 <b>--color</b>         ... use color highlighting (can be used on terminals which
                     support ANSI escape codes)
 
+<b>--mawk</b>          ... use mawk, the very fast AWK implementation based on a
+                    bytecode interpreter. Without this option, awk is used,
+                    which usually maps to GNU awk (but not always).
+                    (Note: If you know that awk on your system maps to mawk,
+                     use this option to make the mawk usage explicit, as this
+                     option also turns off mawk's i/o buffering on places where
+                     progress of commands is displayed, i.e. on places where
+                     i/o buffering causes confusion and is unwanted).
+
 <b>--lTest</b>         ... (do not use in real operations) support for lint-testing
                     of AWK programs
 

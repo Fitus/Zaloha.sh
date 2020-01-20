@@ -578,6 +578,15 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --color         ... use color highlighting (can be used on terminals which
                     support ANSI escape codes)
 
+--mawk          ... use mawk, the very fast AWK implementation based on a
+                    bytecode interpreter. Without this option, awk is used,
+                    which usually maps to GNU awk (but not always).
+                    (Note: If you know that awk on your system maps to mawk,
+                     use this option to make the mawk usage explicit, as this
+                     option also turns off mawk's i/o buffering on places where
+                     progress of commands is displayed, i.e. on places where
+                     i/o buffering causes confusion and is unwanted).
+
 --lTest         ... (do not use in real operations) support for lint-testing
                     of AWK programs
 
@@ -1222,6 +1231,7 @@ noR850Hdr=0
 noR860Hdr=0
 noProgress=0
 color=0
+mawk=0
 lTest=0
 help=0
 
@@ -1269,6 +1279,7 @@ do
     --noR860Hdr)         noR860Hdr=1 ;;
     --noProgress)        noProgress=1 ;;
     --color)             color=1 ;;
+    --mawk)              mawk=1 ;;
     --lTest)             lTest=1 ;;
     --help)              help=1 ;;
     *) error_exit "Unknown option ${tmpVal}, get help via Zaloha.sh --help" ;;
@@ -1299,9 +1310,15 @@ if [ ${noExec5Hdr} -eq 1 ] && [ ${noExec} -eq 0 ]; then
   error_exit "Option --noExec5Hdr can be used only together with option --noExec"
 fi
 
-awkLint=
-if [ ${lTest} -eq 1 ]; then
-  awkLint="-Lfatal"
+if [ ${mawk} -eq 1 ]; then
+  awk="mawk"
+  awkNoBuf="mawk -W interactive"
+elif [ ${lTest} -eq 1 ]; then
+  awk="awk -Lfatal"
+  awkNoBuf="awk -Lfatal"
+else
+  awk="awk"
+  awkNoBuf="awk"
 fi
 
 ###########################################################
@@ -1511,7 +1528,7 @@ f850Awk="${metaDirAwk}${f850Base}"
 f860Awk="${metaDirAwk}${f860Base}"
 
 ###########################################################
-awk ${awkLint} '{ print }' << PARAMFILE > "${f000}"
+${awk} '{ print }' << PARAMFILE > "${f000}"
 ${TRIPLET}${FSTAB}sourceDir${FSTAB}${sourceDir}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}sourceDirAwk${FSTAB}${sourceDirAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}sourceDirPattAwk${FSTAB}${sourceDirPattAwk}${FSTAB}${TRIPLET}
@@ -1569,6 +1586,7 @@ ${TRIPLET}${FSTAB}noR850Hdr${FSTAB}${noR850Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR860Hdr${FSTAB}${noR860Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}mawk${FSTAB}${mawk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}lTest${FSTAB}${lTest}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findLastRunOpsFinalAwk${FSTAB}${findLastRunOpsFinalAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findSourceOpsFinalAwk${FSTAB}${findSourceOpsFinalAwk}${FSTAB}${TRIPLET}
@@ -1576,7 +1594,7 @@ ${TRIPLET}${FSTAB}findBackupOpsFinalAwk${FSTAB}${findBackupOpsFinalAwk}${FSTAB}$
 PARAMFILE
 
 ###########################################################
-awk ${awkLint} '{ print }' << 'AWKAWKPREPROC' > "${f100}"
+${awk} '{ print }' << 'AWKAWKPREPROC' > "${f100}"
 BEGIN {
   eex = "BEGIN {\n"                                                         \
         "  error_exit_filename = \"\"\n"                                    \
@@ -1610,7 +1628,8 @@ BEGIN {
   gsub( /FSTAB/, "\"\\t\"" )
   gsub( /TAB/, "\"\\t\"" )
   gsub( /NLINE/, "\"\\n\"" )
-  gsub( /BSLASH/, "\"\\\\\"" )
+  gsub( /BSLASH/, "\"BSLASH\\\"" )
+  gsub( /BSLASH/, "\\" )
   gsub( /SLASHREGEX/, "/\\//" )
   gsub( /SLASH/, "\"/\"" )
   gsub( /DQUOTE/, "\"\\\"\"" )
@@ -1648,7 +1667,7 @@ BEGIN {
 }
 AWKAWKPREPROC
 
-awk ${awkLint} -f "${f100}" << 'AWKXTRACE2TERM' > "${f102}"
+${awk} -f "${f100}" << 'AWKXTRACE2TERM' > "${f102}"
 {
   if ( 1 == color ) {
     gsub( TABREGEX, TRIPLETT )
@@ -1662,7 +1681,7 @@ awk ${awkLint} -f "${f100}" << 'AWKXTRACE2TERM' > "${f102}"
 }
 AWKXTRACE2TERM
 
-awk ${awkLint} -f "${f100}" << 'AWKACTIONS2TERM' > "${f104}"
+${awk} -f "${f100}" << 'AWKACTIONS2TERM' > "${f104}"
 BEGIN {
   FS = FSTAB
 }
@@ -1685,7 +1704,7 @@ BEGIN {
 AWKACTIONS2TERM
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKPARSER' > "${f106}"
+${awk} -f "${f100}" << 'AWKPARSER' > "${f106}"
 DEFINE_ERROR_EXIT
 BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, startPoint )
@@ -1793,38 +1812,35 @@ fi
 
 start_progress "Parsing"
 
-awk ${awkLint}                              \
-    -f "${f106}"                            \
-    -v sourceBackup="L"                     \
-    -v startPoint="${metaDirAwk}"           \
-    -v findOps="${findLastRunOpsFinalAwk}"  \
-    -v tripletDSepV="${metaDirPattAwk}"     \
-    -v outFile="${f300Awk}"                 \
-    -v noProgress=${noProgress}             > "${f200}"
+${awk} -f "${f106}"                            \
+       -v sourceBackup="L"                     \
+       -v startPoint="${metaDirAwk}"           \
+       -v findOps="${findLastRunOpsFinalAwk}"  \
+       -v tripletDSepV="${metaDirPattAwk}"     \
+       -v outFile="${f300Awk}"                 \
+       -v noProgress=${noProgress}             > "${f200}"
 
-awk ${awkLint}                              \
-    -f "${f106}"                            \
-    -v sourceBackup="S"                     \
-    -v startPoint="${sourceDirAwk}"         \
-    -v findOps="${findSourceOpsFinalAwk}"   \
-    -v tripletDSepV="${sourceDirPattAwk}"   \
-    -v outFile="${f310Awk}"                 \
-    -v noProgress=${noProgress}             > "${f210}"
+${awk} -f "${f106}"                            \
+       -v sourceBackup="S"                     \
+       -v startPoint="${sourceDirAwk}"         \
+       -v findOps="${findSourceOpsFinalAwk}"   \
+       -v tripletDSepV="${sourceDirPattAwk}"   \
+       -v outFile="${f310Awk}"                 \
+       -v noProgress=${noProgress}             > "${f210}"
 
-awk ${awkLint}                              \
-    -f "${f106}"                            \
-    -v sourceBackup="B"                     \
-    -v startPoint="${backupDirAwk}"         \
-    -v findOps="${findBackupOpsFinalAwk}"   \
-    -v tripletDSepV="${backupDirPattAwk}"   \
-    -v outFile="${f320Awk}"                 \
-    -v noProgress=${noProgress}             > "${f220}"
+${awk} -f "${f106}"                            \
+       -v sourceBackup="B"                     \
+       -v startPoint="${backupDirAwk}"         \
+       -v findOps="${findBackupOpsFinalAwk}"   \
+       -v tripletDSepV="${backupDirPattAwk}"   \
+       -v outFile="${f320Awk}"                 \
+       -v noProgress=${noProgress}             > "${f220}"
 
 stop_progress
 
 if [ ${noLastRun} -eq 0 ]; then
 
-  bash "${f200}" | awk ${awkLint} -f "${f102}" -v color=${color}
+  bash "${f200}" | ${awkNoBuf} -f "${f102}" -v color=${color}
 
   fLastRun="${f300}"
 
@@ -1838,7 +1854,7 @@ fi
 
 if [ ${noFindSource} -eq 0 ]; then
 
-  bash "${f210}" | awk ${awkLint} -f "${f102}" -v color=${color}
+  bash "${f210}" | ${awkNoBuf} -f "${f102}" -v color=${color}
 
 else
 
@@ -1854,7 +1870,7 @@ fi
 
 if [ ${noFindBackup} -eq 0 ]; then
 
-  bash "${f220}" | awk ${awkLint} -f "${f102}" -v color=${color}
+  bash "${f220}" | ${awkNoBuf} -f "${f102}" -v color=${color}
 
 else
 
@@ -1869,7 +1885,7 @@ else
 fi
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKCLEANER' > "${f110}"
+${awk} -f "${f100}" << 'AWKCLEANER' > "${f110}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB   # FSTAB or TAB, because fields are separated both by tabs produced by FIND as well as by tabs contained in filenames
@@ -1960,18 +1976,18 @@ AWKCLEANER
 
 start_progress "Cleaning"
 
-awk ${awkLint} -f "${f110}" "${f310}" > "${f330}"
+${awk} -f "${f110}" "${f310}" > "${f330}"
 
 optim_csv_after_use "${f310}"
 
-awk ${awkLint} -f "${f110}" "${f320}" > "${f340}"
+${awk} -f "${f110}" "${f320}" > "${f340}"
 
 optim_csv_after_use "${f320}"
 
 stop_progress
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKCHECKER' > "${f130}"
+${awk} -f "${f100}" << 'AWKCHECKER' > "${f130}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
@@ -2039,12 +2055,12 @@ AWKCHECKER
 
 start_progress "Checking"
 
-awk ${awkLint} -f "${f130}" "${fLastRun}" "${f330}" "${f340}"
+${awk} -f "${f130}" "${fLastRun}" "${f330}" "${f340}"
 
 stop_progress
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKHLINKS' > "${f150}"
+${awk} -f "${f100}" << 'AWKHLINKS' > "${f150}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
@@ -2115,7 +2131,7 @@ if [ ${hLinks} -eq 1 ]; then
 
   start_progress "Hardlinks detecting"
 
-  awk ${awkLint} -f "${f150}" "${f350}" > "${f360}"
+  ${awk} -f "${f150}" "${f350}" > "${f360}"
 
   optim_csv_after_use "${f350}"
 
@@ -2133,7 +2149,7 @@ else
 fi
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKDIFF' > "${f170}"
+${awk} -f "${f100}" << 'AWKDIFF' > "${f170}"
 DEFINE_ERROR_EXIT
 DEFINE_WARNING
 BEGIN {
@@ -2395,26 +2411,25 @@ stop_progress
 
 start_progress "Differences processing"
 
-awk ${awkLint}                 \
-    -f "${f170}"               \
-    -v noRemove=${noRemove}    \
-    -v revNew=${revNew}        \
-    -v revUp=${revUp}          \
-    -v ok2s=${ok2s}            \
-    -v ok3600s=${ok3600s}      \
-    -v noUnlink=${noUnlink}    \
-    -v pUser=${pUser}          \
-    -v pGroup=${pGroup}        \
-    -v pMode=${pMode}          \
-    -v noLastRun=${noLastRun}  \
-    "${fLastRun}" "${f370}"      > "${f380}"
+${awk} -f "${f170}"               \
+       -v noRemove=${noRemove}    \
+       -v revNew=${revNew}        \
+       -v revUp=${revUp}          \
+       -v ok2s=${ok2s}            \
+       -v ok3600s=${ok3600s}      \
+       -v noUnlink=${noUnlink}    \
+       -v pUser=${pUser}          \
+       -v pGroup=${pGroup}        \
+       -v pMode=${pMode}          \
+       -v noLastRun=${noLastRun}  \
+       "${fLastRun}" "${f370}"    > "${f380}"
 
 optim_csv_after_use "${f370}"
 
 stop_progress
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKPOSTPROC' > "${f190}"
+${awk} -f "${f100}" << 'AWKPOSTPROC' > "${f190}"
 BEGIN {
   FS = FSTAB
   OFS = FSTAB
@@ -2489,19 +2504,18 @@ else
 
 fi
 
-awk ${awkLint}               \
-    -f "${f190}"             \
-    -v f510="${f510Awk}"     \
-    -v f540="${f540Awk}"     \
-    -v noRemove=${noRemove}  \
-    "${f390}"                > "${f500}"
+${awk} -f "${f190}"             \
+       -v f510="${f510Awk}"     \
+       -v f540="${f540Awk}"     \
+       -v noRemove=${noRemove}  \
+       "${f390}"                > "${f500}"
 
 optim_csv_after_use "${f390}"
 
 stop_progress
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKSELECT23' > "${f405}"
+${awk} -f "${f100}" << 'AWKSELECT23' > "${f405}"
 BEGIN {
   FS = FSTAB
   OFS = FSTAB
@@ -2544,8 +2558,7 @@ else
 
 fi
 
-LC_ALL=C sort -t "${FSTAB}" -k13,13 -k2,2 "${f500}" | awk ${awkLint} \
-    -f "${f405}"          \
+LC_ALL=C sort -t "${FSTAB}" -k13,13 -k2,2 "${f500}" | ${awk} -f "${f405}"  \
     -v f520="${f520Awk}"  \
     -v f530="${f530Awk}"  \
     -v revNew=${revNew}   \
@@ -2613,7 +2626,7 @@ else
 fi
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKEXEC1' > "${f410}"
+${awk} -f "${f100}" << 'AWKEXEC1' > "${f410}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
@@ -2659,17 +2672,16 @@ AWKEXEC1
 
 start_progress "Preparing shellscript for Exec1"
 
-awk ${awkLint}                      \
-    -f "${f410}"                    \
-    -v backupDir="${backupDirAwk}"  \
-    -v noExec=${noExec}             \
-    -v noExecHdr=${noExec1Hdr}      \
-    "${f510}"                       > "${f610}"
+${awk} -f "${f410}"                    \
+       -v backupDir="${backupDirAwk}"  \
+       -v noExec=${noExec}             \
+       -v noExecHdr=${noExec1Hdr}      \
+       "${f510}"                       > "${f610}"
 
 stop_progress
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKEXEC2' > "${f420}"
+${awk} -f "${f100}" << 'AWKEXEC2' > "${f420}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
@@ -2800,23 +2812,22 @@ AWKEXEC2
 
 start_progress "Preparing shellscript for Exec2"
 
-awk ${awkLint}                      \
-    -f "${f420}"                    \
-    -v sourceDir="${sourceDirAwk}"  \
-    -v backupDir="${backupDirAwk}"  \
-    -v noExec=${noExec}             \
-    -v noUnlink=${noUnlink}         \
-    -v touch=${touch}               \
-    -v pUser=${pUser}               \
-    -v pGroup=${pGroup}             \
-    -v pMode=${pMode}               \
-    -v noExecHdr=${noExec2Hdr}      \
-    "${f520}"                       > "${f620}"
+${awk} -f "${f420}"                    \
+       -v sourceDir="${sourceDirAwk}"  \
+       -v backupDir="${backupDirAwk}"  \
+       -v noExec=${noExec}             \
+       -v noUnlink=${noUnlink}         \
+       -v touch=${touch}               \
+       -v pUser=${pUser}               \
+       -v pGroup=${pGroup}             \
+       -v pMode=${pMode}               \
+       -v noExecHdr=${noExec2Hdr}      \
+       "${f520}"                       > "${f620}"
 
 stop_progress
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKEXEC3' > "${f430}"
+${awk} -f "${f100}" << 'AWKEXEC3' > "${f430}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
@@ -2951,17 +2962,16 @@ if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
 
   start_progress "Preparing shellscript for Exec3"
 
-  awk ${awkLint}                      \
-      -f "${f430}"                    \
-      -v sourceDir="${sourceDirAwk}"  \
-      -v backupDir="${backupDirAwk}"  \
-      -v noExec=${noExec}             \
-      -v touch=${touch}               \
-      -v pRevUser=${pRevUser}         \
-      -v pRevGroup=${pRevGroup}       \
-      -v pRevMode=${pRevMode}         \
-      -v noExecHdr=${noExec3Hdr}      \
-      "${f530}"                       > "${f630}"
+  ${awk} -f "${f430}"                    \
+         -v sourceDir="${sourceDirAwk}"  \
+         -v backupDir="${backupDirAwk}"  \
+         -v noExec=${noExec}             \
+         -v touch=${touch}               \
+         -v pRevUser=${pRevUser}         \
+         -v pRevGroup=${pRevGroup}       \
+         -v pRevMode=${pRevMode}         \
+         -v noExecHdr=${noExec3Hdr}      \
+         "${f530}"                       > "${f630}"
 
   stop_progress
 
@@ -2981,12 +2991,11 @@ if [ ${noRemove} -eq 0 ]; then
 
   start_progress "Preparing shellscript for Exec4"
 
-  awk ${awkLint}                      \
-      -f "${f410}"                    \
-      -v backupDir="${backupDirAwk}"  \
-      -v noExec=${noExec}             \
-      -v noExecHdr=${noExec4Hdr}      \
-      "${f540}"                       > "${f640}"
+  ${awk} -f "${f410}"                    \
+         -v backupDir="${backupDirAwk}"  \
+         -v noExec=${noExec}             \
+         -v noExecHdr=${noExec4Hdr}      \
+         "${f540}"                       > "${f640}"
 
   stop_progress
 
@@ -3006,18 +3015,17 @@ if [ ${byteByByte} -eq 1 ]; then
 
   start_progress "Preparing shellscript for Exec5"
 
-  awk ${awkLint}                      \
-      -f "${f420}"                    \
-      -v sourceDir="${sourceDirAwk}"  \
-      -v backupDir="${backupDirAwk}"  \
-      -v noExec=${noExec}             \
-      -v noUnlink=${noUnlink}         \
-      -v touch=${touch}               \
-      -v pUser=${pUser}               \
-      -v pGroup=${pGroup}             \
-      -v pMode=${pMode}               \
-      -v noExecHdr=${noExec5Hdr}      \
-      "${f550}"                       > "${f650}"
+  ${awk} -f "${f420}"                    \
+         -v sourceDir="${sourceDirAwk}"  \
+         -v backupDir="${backupDirAwk}"  \
+         -v noExec=${noExec}             \
+         -v noUnlink=${noUnlink}         \
+         -v touch=${touch}               \
+         -v pUser=${pUser}               \
+         -v pGroup=${pGroup}             \
+         -v pMode=${pMode}               \
+         -v noExecHdr=${noExec5Hdr}      \
+         "${f550}"                       > "${f650}"
 
   stop_progress
 
@@ -3032,7 +3040,7 @@ else
 fi
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKTOUCH' > "${f490}"
+${awk} -f "${f100}" << 'AWKTOUCH' > "${f490}"
 BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, metaDir )
   gsub( QUOTEREGEX, QUOTEESC, metaDir )
@@ -3049,16 +3057,15 @@ AWKTOUCH
 
 start_progress "Preparing shellscript to touch file 999"
 
-awk ${awkLint}                  \
-    -f "${f490}"                \
-    -v metaDir="${metaDirAwk}"  \
-    -v f000Base="${f000Base}"   \
-    -v f999Base="${f999Base}"   > "${f690}"
+${awk} -f "${f490}"                \
+       -v metaDir="${metaDirAwk}"  \
+       -v f000Base="${f000Base}"   \
+       -v f999Base="${f999Base}"   > "${f690}"
 
 stop_progress
 
 ###########################################################
-awk ${awkLint} -f "${f100}" << 'AWKRESTORE' > "${f700}"
+${awk} -f "${f100}" << 'AWKRESTORE' > "${f700}"
 BEGIN {
   FS = FSTAB
   pin = 1         # parallel index
@@ -3198,25 +3205,24 @@ if [ ${noRestore} -eq 0 ]; then
 
   start_progress "Preparing shellscripts for case of restore"
 
-  awk ${awkLint}                       \
-      -f "${f700}"                     \
-      -v backupDir="${backupDirAwk}"   \
-      -v restoreDir="${sourceDirAwk}"  \
-      -v f800="${f800Awk}"             \
-      -v f810="${f810Awk}"             \
-      -v f820="${f820Awk}"             \
-      -v f830="${f830Awk}"             \
-      -v f840="${f840Awk}"             \
-      -v f850="${f850Awk}"             \
-      -v f860="${f860Awk}"             \
-      -v noR800Hdr=${noR800Hdr}        \
-      -v noR810Hdr=${noR810Hdr}        \
-      -v noR820Hdr=${noR820Hdr}        \
-      -v noR830Hdr=${noR830Hdr}        \
-      -v noR840Hdr=${noR840Hdr}        \
-      -v noR850Hdr=${noR850Hdr}        \
-      -v noR860Hdr=${noR860Hdr}        \
-      "${f505}"
+  ${awk} -f "${f700}"                     \
+         -v backupDir="${backupDirAwk}"   \
+         -v restoreDir="${sourceDirAwk}"  \
+         -v f800="${f800Awk}"             \
+         -v f810="${f810Awk}"             \
+         -v f820="${f820Awk}"             \
+         -v f830="${f830Awk}"             \
+         -v f840="${f840Awk}"             \
+         -v f850="${f850Awk}"             \
+         -v f860="${f860Awk}"             \
+         -v noR800Hdr=${noR800Hdr}        \
+         -v noR810Hdr=${noR810Hdr}        \
+         -v noR820Hdr=${noR820Hdr}        \
+         -v noR830Hdr=${noR830Hdr}        \
+         -v noR840Hdr=${noR840Hdr}        \
+         -v noR850Hdr=${noR850Hdr}        \
+         -v noR860Hdr=${noR860Hdr}        \
+         "${f505}"
 
   stop_progress
 
@@ -3245,7 +3251,7 @@ if [ -s "${f510}" ]; then
   echo "UNAVOIDABLE REMOVALS FROM ${backupDirTerm}"
   echo "==========================================="
 
-  awk ${awkLint} -f "${f104}" -v color=${color} "${f510}"
+  ${awk} -f "${f104}" -v color=${color} "${f510}"
 
   if [ ${noRemove} -eq 1 ]; then
     echo
@@ -3255,7 +3261,7 @@ if [ -s "${f510}" ]; then
   read -p "Execute above listed removals from ${backupDirTerm} ? [Y/y=Yes, other=do nothing and abort]: " tmpVal
   if [ "Y" == "${tmpVal/y/Y}" ]; then
     echo
-    bash "${f610}" | awk ${awkLint} -f "${f102}" -v color=${color}
+    bash "${f610}" | ${awkNoBuf} -f "${f102}" -v color=${color}
   else
     error_exit "User requested Zaloha to abort"
   fi
@@ -3265,14 +3271,14 @@ echo
 echo "TO BE COPIED TO ${backupDirTerm}"
 echo "==========================================="
 
-awk ${awkLint} -f "${f104}" -v color=${color} "${f520}"
+${awk} -f "${f104}" -v color=${color} "${f520}"
 
 if [ -s "${f520}" ]; then
   echo
   read -p "Execute above listed copies to ${backupDirTerm} ? [Y/y=Yes, other=do nothing and abort]: " tmpVal
   if [ "Y" == "${tmpVal/y/Y}" ]; then
     echo
-    bash "${f620}" | awk ${awkLint} -f "${f102}" -v color=${color}
+    bash "${f620}" | ${awkNoBuf} -f "${f102}" -v color=${color}
   else
     error_exit "User requested Zaloha to abort"
   fi
@@ -3283,14 +3289,14 @@ if [ ${revNew} -eq 1 ] || [ ${revUp} -eq 1 ]; then
   echo "TO BE REVERSE-COPIED TO ${sourceDirTerm}"
   echo "==========================================="
 
-  awk ${awkLint} -f "${f104}" -v color=${color} "${f530}"
+  ${awk} -f "${f104}" -v color=${color} "${f530}"
 
   if [ -s "${f530}" ]; then
     echo
     read -p "Execute above listed reverse-copies to ${sourceDirTerm} ? [Y/y=Yes, other=do nothing and abort]: " tmpVal
     if [ "Y" == "${tmpVal/y/Y}" ]; then
       echo
-      bash "${f630}" | awk ${awkLint} -f "${f102}" -v color=${color}
+      bash "${f630}" | ${awkNoBuf} -f "${f102}" -v color=${color}
     else
       error_exit "User requested Zaloha to abort"
     fi
@@ -3302,14 +3308,14 @@ if [ ${noRemove} -eq 0 ]; then
   echo "TO BE REMOVED FROM ${backupDirTerm}"
   echo "==========================================="
 
-  awk ${awkLint} -f "${f104}" -v color=${color} "${f540}"
+  ${awk} -f "${f104}" -v color=${color} "${f540}"
 
   if [ -s "${f540}" ]; then
     echo
     read -p "Execute above listed removals from ${backupDirTerm} ? [Y/y=Yes, other=do nothing and abort]: " tmpVal
     if [ "Y" == "${tmpVal/y/Y}" ]; then
       echo
-      bash "${f640}" | awk ${awkLint} -f "${f102}" -v color=${color}
+      bash "${f640}" | ${awkNoBuf} -f "${f102}" -v color=${color}
     else
       error_exit "User requested Zaloha to abort"
     fi
@@ -3321,14 +3327,14 @@ if [ ${byteByByte} -eq 1 ]; then
   echo "FROM BYTE BY BYTE COMPARING: TO BE COPIED TO ${backupDirTerm}"
   echo "==========================================="
 
-  awk ${awkLint} -f "${f104}" -v color=${color} "${f550}"
+  ${awk} -f "${f104}" -v color=${color} "${f550}"
 
   if [ -s "${f550}" ]; then
     echo
     read -p "Execute above listed copies to ${backupDirTerm} ? [Y/y=Yes, other=do nothing and abort]: " tmpVal
     if [ "Y" == "${tmpVal/y/Y}" ]; then
       echo
-      bash "${f650}" | awk ${awkLint} -f "${f102}" -v color=${color}
+      bash "${f650}" | ${awkNoBuf} -f "${f102}" -v color=${color}
     else
       error_exit "User requested Zaloha to abort"
     fi
