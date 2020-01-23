@@ -349,99 +349,16 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     throws an error (except when the "--noDirChecks" option is given).
 
 --findSourceOps=<findSourceOps> are additional operands for the FIND command
-    that searches <sourceDir>, to be used to exclude files or subdirectories
-    from synchronization, based on file path or file name patterns:
+    that scans <sourceDir>, to be used to exclude files or subdirectories in
+    <sourceDir> from synchronization to <backupDir>. This is a complex topic,
+    described in full detail in section FIND operands to control FIND commands
+    invoked by Zaloha.
 
-      -path <file path pattern> -prune -o
-      -name <file name pattern> -prune -o
-
-    If the pattern matches a subdirectory, the "-prune" operand instructs FIND
-    to not descend into it.
-
-    Each expression must be followed by the OR operator (-o). If several
-    expressions are given, they must form an OR-connected chain:
-    expressionA -o expressionB -o expressionC -o ... This is required because
-    Zaloha internally combines <findSourceOps> with <findGeneralOps> and with
-    own expressions, and all of them follow this convention. If an earlier
-    expression in the OR-connected chain evaluates TRUE, FIND does not evaluate
-    following expressions, leading to no output being produced.
-
-    <findSourceOps> applies only to <sourceDir>. If a file on <sourceDir> is
-    excluded by <findSourceOps> and the same file exists on <backupDir>,
-    then Zaloha evaluates the file on <backupDir> as obsolete (= removes it,
-    unless the "--noRemove" option is given, or eventually even tries to
-    reverse-synchronize it, which leads to one of the corner cases (see below)).
-    Compare this with <findGeneralOps> (the next option).
-
-    Although <findSourceOps> consists of multiple words, it is passed in as
-    a single string (= enclose it in double-quotes or single-quotes in your
-    shell). Zaloha contains a special parser (AWKPARSER) that splits it into
-    separate words (arguments for the FIND command). If a word (pattern) in
-    <findSourceOps> contains spaces, enclose it in double-quotes. Note: to
-    protect the double-quotes from your shell, use \". If a word (pattern) in
-    <findSourceOps> itself contains a double quote, use \". Note: to protect
-    the backslash and the double-quote from your shell, use \\\".
-
-    Please note that in the patterns of the -path and -name expressions, FIND
-    itself interprets following characters specially (see FIND documentation):
-    *, ?, [, ], \. If these characters are to be taken literally, they must be
-    backslash-escaped. Again, take care of protecting backslashes from your
-    shell.
-
-    If the expression with the "-path" test is used, the placeholder ///d/
-    should be used in place of <sourceDir>/. Zaloha will replace ///d/ by
-    <sourceDir>/ in the form that is passed to FIND as start point directory,
-    and with eventual FIND pattern special characters properly escaped
-    (which relieves you from doing the same by yourself).
-
-    Examples: * exclude <sourceDir>/.git,
-              * exclude all files or subdirectories Windows Security
-              * exclude all files or subdirectories My "Secret" Things
-
-    (double-quoted and single-quoted versions):
-
-    --findSourceOps="-path ///d/.git -prune -o"
-    --findSourceOps="-name \"Windows Security\" -prune -o"
-    --findSourceOps="-name \"My \\\"Secret\\\" Things\" -prune -o"
-
-    --findSourceOps='-path ///d/.git -prune -o'
-    --findSourceOps='-name "Windows Security" -prune -o'
-    --findSourceOps='-name "My \"Secret\" Things" -prune -o'
-
---findGeneralOps=<findGeneralOps> underlies the same rules as <findSourceOps>
-    (please read first). The key difference is that <findGeneralOps> applies to
-    both <sourceDir> and <backupDir>. This means, that files and subdirectories
-    excluded by <findGeneralOps> are not visible to Zaloha, so Zaloha will not
-    act on them. The main use of <findGeneralOps> is to exclude "Trash"
-    subdirectories from synchronization. <findGeneralOps> has an internally
-    defined default, used to exclude:
-
-    <sourceDir or backupDir>/$RECYCLE.BIN
-      ... Windows Recycle Bin (assumed to exist directly under <sourceDir> or
-          <backupDir>)
-
-    <sourceDir or backupDir>/.Trash_<number>*
-      ... Linux Trash (assumed to exist directly under <sourceDir> or
-          <backupDir>)
-
-    <sourceDir or backupDir>/lost+found
-      ... Linux lost + found filesystem fragments (assumed to exist directly
-          under <sourceDir> or <backupDir>)
-
-    The placeholder ///d/ is for <sourceDir>/ or <backupDir>/, depending on the
-    actual search, and it must be used if the expression with the "-path" test
-    is used, unless, perhaps, the <sourceDir> and <backupDir> parts of the paths
-    are matched by a wildcard.
-
-    Beware of matching the start point directories <sourceDir> or <backupDir>
-    themselves by the patterns.
-
-    To extend (= combine, not replace) the internally defined <findGeneralOps>
-    with own extension, pass in own extension prepended by the plus sign ("+").
-
-    *** CAUTION <findSourceOps> AND <findGeneralOps>: Zaloha will not prevent
-    passing in other FIND expressions than described above, to allow eventual
-    advanced use by knowledgeable users.
+--findGeneralOps=<findGeneralOps> are additional operands for the FIND commands
+    that scan both <sourceDir> and <backupDir>, to be used to exclude "Trash"
+    subdirectories, independently on where they exist, from Zaloha's scope.
+    This is a complex topic, described in full detail in section FIND operands
+    to control FIND commands invoked by Zaloha.
 
 --noExec        ... needed if Zaloha is invoked automatically: do not ask,
     do not execute the actions, but still prepare the scripts. The prepared
@@ -531,7 +448,7 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
       c) advanced use of Zaloha, see Advanced Use of Zaloha section below
     It is possible (but not recommended) to place <metaDir> to a different
     location inside of <backupDir>, or inside of <sourceDir>. In such cases,
-    FIND expressions to exclude the metadata directory from the FIND searches
+    FIND expressions to exclude the metadata directory from the FIND scans
     must be explicitly passed in via <findGeneralOps>.
     If Zaloha is used to synchronize multiple directories, then each such
     instance of Zaloha must have its own separate metadata directory.
@@ -548,9 +465,9 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
                     distinction of operations on files newer than the last run
                     of Zaloha (e.g. distinction between UPDATE.! and UPDATE).
 
---noFindSource  ... do not run FIND (script 210) to search <sourceDir>
+--noFindSource  ... do not run FIND (script 210) to scan <sourceDir>
                     and use externally supplied CSV metadata file 310 instead
---noFindBackup  ... do not run FIND (script 220) to search <backupDir>
+--noFindBackup  ... do not run FIND (script 220) to scan <backupDir>
                     and use externally supplied CSV metadata file 320 instead
    (Explained in the Advanced Use of Zaloha section below).
 
@@ -619,6 +536,232 @@ run (this is an important test case, see below).
 Typically, Zaloha is invoked from a wrapper script that does the necessary
 directory mounts, then runs Zaloha with the required parameters, then directory
 unmounts.
+
+###########################################################
+
+FIND OPERANDS TO CONTROL FIND COMMANDS INVOKED BY ZALOHA
+
+Zaloha obtains information about the files and directories via the FIND command.
+
+Ad FIND command itself: It must support the -printf operand, as this allows to
+obtain all needed information from a directory in one scan (= one process),
+which is efficient. GNU find supports the -printf operand, but some older
+FIND implementations don't, so they cannot be used with Zaloha.
+
+The FIND scans of <sourceDir> and <backupDir> can be modified by two options:
+Option "--findSourceOps" are additional operands for the FIND command that scans
+<sourceDir> only, and the option "--findGeneralOps" are additional operands
+for both FIND commands (scans of both <sourceDir> and <backupDir>).
+
+Difference between <findSourceOps> and <findGeneralOps>
+-------------------------------------------------------
+<findSourceOps> applies only to <sourceDir>. If a file in <sourceDir> is
+excluded by <findSourceOps> and the same file exists in <backupDir>, then
+Zaloha evaluates the file in <backupDir> as obsolete (= removes it, unless the
+"--noRemove" option is given, or eventually even attempts to reverse-synchronize
+it (which leads to one of the corner cases (see the Corner Cases section)).
+
+On the contrary, the files excluded by <findGeneralOps> are not visible to
+Zaloha at all, neither in <sourceDir> nor in <backupDir>, so Zaloha will not
+act on them.
+
+The main use of <findSourceOps> is to exclude files or subdirectories in
+<sourceDir> from synchronization to <backupDir>.
+
+The main use of <findGeneralOps> is to exclude "Trash" subdirectories,
+independently on where they exist, from Zaloha's scope.
+
+Rules and limitations
+---------------------
+Both <findSourceOps> and <findGeneralOps> must consist of one or more
+FIND expressions in the form of an OR-connected chain:
+
+    expressionA -o expressionB -o ... expressionN -o
+
+Adherence to this convention assures that Zaloha is able to correctly combine
+<findSourceOps> with <findGeneralOps> and with own FIND expressions.
+
+The OR-connected chain works so that if an earlier expression in the chain
+evaluates TRUE, FIND does not evaluate following expressions, i.e. will not
+evaluate the final -printf operand, so no output will be produced. In other
+words, matching by any of the expressions leads to exclusion.
+
+Further, the internal logic of Zaloha imposes the following limitations:
+
+ * Exclusion of files by the "--findSourceOps" option: No limitations exist
+   here, all expressions supported by FIND can be used (but make sure the
+   exclusion applies only to files). Example: exclude all files smaller than
+   1000 bytes:
+
+    --findSourceOps='( -type f -a -size -1000c ) -o'
+
+ * Exclusion of subdirectories by the "--findSourceOps" option: One limitation
+   must be obeyed: If a subdirectory is excluded, all its contents must be
+   excluded too. Why? If Zaloha sees the contents but not the subdirectory
+   itself, it will prepare commands to create the contents of the subdirectory,
+   but they will fail as the command to create the subdirectory itself (mkdir)
+   will not be prepared. Example: exclude all subdirectories owned by user fred
+   including all their contents:
+
+    --findSourceOps='( -type d -a -user fred ) -prune -o'
+
+   The -prune operand instructs FIND to not descend into directories matched
+   by the preceding expression.
+
+ * Exclusion of files by the "--findGeneralOps" option: As <findGeneralOps>
+   applies to both <sourceDir> and <backupDir>, and the objects in both
+   directories are "matched" by file paths, only expressions with -path or
+   -name operands make sense. Why? If objects exist under same paths in both
+   directories, Zaloha should either see both of them or none of them.
+   Both -path and -name expressions assure this, but not necessarily the
+   expressions based on other operands like -size, -user and so on.
+   Example: exclude core dumps (files named core) wherever they exist:
+
+    --findGeneralOps='( -type f -a -name core ) -o'
+
+ * Exclusion of subdirectories by the "--findGeneralOps" option: Both above
+   described limitations must be obeyed: Only expressions with -path or -name
+   operands are allowed, and if subdirectories are excluded, all their contents
+   must be excluded too. Example: exclude subdirectories lost+found wherever
+   they exist:
+
+    --findGeneralOps='( -type d -a -name lost+found ) -prune -o'
+
+   If you do not care if an object is a file or a directory, you can abbreviate:
+
+    --findGeneralOps='-name unwanted_name -prune -o'
+    --findGeneralOps='-path unwanted_path -prune -o'
+
+*** CAUTION <findSourceOps> AND <findGeneralOps>: Zaloha does not validate if
+the described rules and limitations are indeed obeyed. Wrong <findSourceOps>
+and/or <findGeneralOps> can break Zaloha. On the other hand, an eventual
+advanced use by knowledgeable users is not prevented.
+
+Troubleshooting
+---------------
+If FIND operands do not work as expected, debug them using FIND alone.
+Let's assume, that this does not work as expected:
+
+    --findSourceOps='( -type f -a -name *.tmp ) -o'
+
+The find command to debug this is:
+
+    find <sourceDir> '(' -type f -a -name '*.tmp' ')' -o -printf 'path: %P\n'
+
+Parsing of FIND operands by Zaloha
+----------------------------------
+<findSourceOps> and <findGeneralOps> are passed into Zaloha as single strings.
+Zaloha has to split these strings into individual words (operands) and pass
+these operands to FIND, each operand as a separate command line parameter.
+Zaloha has a special parser (AWKPARSER) to do this.
+
+The easy case is when each separate word is a separate FIND operand. However,
+if a FIND operand contains a space, it must be enclosed in double-quotes ("),
+and if a FIND operand contains a double-quote itself, it must be escaped by a
+backslash (\").
+
+Beware of interaction with your shell - episode 1
+-------------------------------------------------
+Your shell might interpret special characters contained on the command line,
+including the double-quotes (") and backslashes (\) mentioned above.
+
+If your shell is bash, the rules are:
+
+ * If a string is enclosed in single quotes, nothing is interpreted within that
+   string, also no protection is needed for double-quotes and backslashes.
+
+ * If a string is enclosed in double-quotes, both double-quotes and backslashes
+   within that string are interpreted and must be protected: double-quote as
+   \", and backslash as \\.
+
+Examples (both single-quoted and double-quoted versions):
+
+  * exclude all objects named Windows Security
+  * exclude all objects named My "Secret" Things
+
+    --findSourceOps='-name "Windows Security" -prune -o'
+    --findSourceOps='-name "My \"Secret\" Things" -prune -o'
+
+    --findSourceOps="-name \"Windows Security\" -prune -o"
+    --findSourceOps="-name \"My \\\"Secret\\\" Things\" -prune -o"
+
+Interpretation of special characters by FIND itself
+---------------------------------------------------
+In the patterns of the -path and -name expressions, FIND itself interprets
+following characters specially (see FIND documentation): *, ?, [, ], \.
+
+If these characters are to be taken literally, they must be backslash-escaped.
+
+Beware of interaction with your shell - episode 2
+-------------------------------------------------
+An eventual backslash-escaping of *, ?, [, ], \ mentioned above makes a second
+episode of protection from shell interpretation necessary:
+
+Examples (both single-quoted and double-quoted versions):
+
+  * exclude all objects whose names begin with abcd (i.e. FIND pattern abcd*)
+  * exclude all objects named exactly abcd* (literally including the asterisk)
+
+    --findSourceOps='-name abcd* -prune -o'
+    --findSourceOps='-name abcd\* -prune -o'
+
+    --findSourceOps="-name abcd* -prune -o"
+    --findSourceOps="-name abcd\\* -prune -o"
+
+The placeholder ///d/ for the start point directories
+-----------------------------------------------------
+If expressions with the "-path" operand are used in <findSourceOps>, the
+placeholder ///d/ should be used in place of <sourceDir>/ in the path patterns.
+
+If expressions with the "-path" operand are used in <findGeneralOps>, the
+placeholder ///d/ must (not should) be used in place of <sourceDir>/ and
+<backupDir>/ in the path patterns, unless, perhaps, the <sourceDir> and
+<backupDir> parts of the paths are matched by a FIND wildcard.
+
+Zaloha will replace ///d/ by the start point directory that is passed to FIND
+in the given scan, with eventual FIND pattern special characters properly
+escaped (which relieves you from doing the same by yourself).
+
+Example: exclude <sourceDir>/.git
+
+    --findSourceOps="-path ///d/.git -prune -o"
+
+Internally defined default for <findGeneralOps>
+-----------------------------------------------
+<findGeneralOps> has an internally defined default, used to exclude:
+
+    <sourceDir or backupDir>/$RECYCLE.BIN
+      ... Windows Recycle Bin (assumed to exist directly under <sourceDir> or
+          <backupDir>)
+
+    <sourceDir or backupDir>/.Trash_<number>*
+      ... Linux Trash (assumed to exist directly under <sourceDir> or
+          <backupDir>)
+
+    <sourceDir or backupDir>/lost+found
+      ... Linux lost + found filesystem fragments (assumed to exist directly
+          under <sourceDir> or <backupDir>)
+
+To replace this internal default with own <findGeneralOps>:
+
+    --findGeneralOps=<your replacement>
+
+To switch off this internal default:
+
+    --findGeneralOps=
+
+To extend (= combine, not replace) the internal default by own extension (note
+the plus (+) sign):
+
+    --findGeneralOps=+<your extension>
+
+Known traps and problems
+------------------------
+Beware of matching the start point directories <sourceDir> or <backupDir> 
+themselves by the expressions and patterns.
+
+In some FIND versions, the name patterns starting with the asterisk (*)
+wildcard do not match objects whose names start with a dot (.).
 
 ###########################################################
 
