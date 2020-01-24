@@ -648,74 +648,69 @@ The find command to debug this is:
 
     find <sourceDir> '(' -type f -a -name '*.tmp' ')' -o -printf 'path: %P\n'
 
+Beware of interpretation by your shell
+--------------------------------------
+Your shell might interpret certain special characters contained on the command
+line. Should these characters be passed to the called program (= Zaloha)
+uninterpreted, they must be quoted or escaped.
+
+The bash shell does not interpret any characters in strings quoted by single
+quotes. In strings quoted by double-quotes, the situation is more complex.
+
+Please see the respective shell documentation for more details.
+
 Parsing of FIND operands by Zaloha
 ----------------------------------
 <findSourceOps> and <findGeneralOps> are passed into Zaloha as single strings.
-Zaloha has to split these strings into individual words (operands) and pass
-these operands to FIND, each operand as a separate command line parameter.
-Zaloha has a special parser (AWKPARSER) to do this.
+Zaloha has to split these strings into individual operands (words) and pass them
+to FIND, each operand as a separate command line argument. Zaloha has a special
+parser (AWKPARSER) to do this.
 
-The easy case is when each separate word is a separate FIND operand. However,
-if a FIND operand contains a space, it must be enclosed in double-quotes ("),
-and if a FIND operand contains a double-quote itself, it must be escaped by a
-backslash (\").
+The trivial case is when each (space-delimited) word is a separate FIND operand.
+However, if a FIND operand contains spaces, it must be enclosed in double-quotes
+(") to be treated as one operand. Moreover, if a FIND operand contains
+double-quotes themselves, then it too must be enclosed in double-quotes (")
+and the original double-quotes must be escaped by second double-quotes ("").
 
-Beware of interaction with your shell - episode 1
--------------------------------------------------
-Your shell might interpret special characters contained on the command line,
-including the double-quotes (") and backslashes (\) mentioned above.
-
-If your shell is bash, the rules are:
-
- * If a string is enclosed in single quotes, nothing is interpreted within that
-   string, also no protection is needed for double-quotes and backslashes.
-
- * If a string is enclosed in double-quotes, both double-quotes and backslashes
-   within that string are interpreted and must be protected: double-quote as
-   \", and backslash as \\.
-
-Examples (both single-quoted and double-quoted versions):
+Examples (for bash for both single-quoted and double-quoted strings):
 
   * exclude all objects named Windows Security
   * exclude all objects named My "Secret" Things
 
     --findSourceOps='-name "Windows Security" -prune -o'
-    --findSourceOps='-name "My \"Secret\" Things" -prune -o'
+    --findSourceOps='-name "My ""Secret"" Things" -prune -o'
 
     --findSourceOps="-name \"Windows Security\" -prune -o"
-    --findSourceOps="-name \"My \\\"Secret\\\" Things\" -prune -o"
+    --findSourceOps="-name \"My \"\"Secret\"\" Things\" -prune -o"
 
 Interpretation of special characters by FIND itself
 ---------------------------------------------------
 In the patterns of the -path and -name expressions, FIND itself interprets
 following characters specially (see FIND documentation): *, ?, [, ], \.
 
-If these characters are to be taken literally, they must be backslash-escaped.
+If these characters are to be taken literally, they must be handed over to
+FIND backslash-escaped.
 
-Beware of interaction with your shell - episode 2
--------------------------------------------------
-An eventual backslash-escaping of *, ?, [, ], \ mentioned above makes a second
-episode of protection from shell interpretation necessary:
-
-Examples (both single-quoted and double-quoted versions):
+Examples (for bash for both single-quoted and double-quoted strings):
 
   * exclude all objects whose names begin with abcd (i.e. FIND pattern abcd*)
-  * exclude all objects named exactly abcd* (literally including the asterisk)
+  * exclude all objects named exactly mnop* (literally including the asterisk)
 
     --findSourceOps='-name abcd* -prune -o'
-    --findSourceOps='-name abcd\* -prune -o'
+    --findSourceOps='-name mnop\* -prune -o'
 
     --findSourceOps="-name abcd* -prune -o"
-    --findSourceOps="-name abcd\\* -prune -o"
+    --findSourceOps="-name mnop\\* -prune -o"
 
 The placeholder ///d/ for the start point directories
 -----------------------------------------------------
 If expressions with the "-path" operand are used in <findSourceOps>, the
-placeholder ///d/ should be used in place of <sourceDir>/ in the path patterns.
+placeholder ///d/ should be used in place of <sourceDir>/ in their path
+patterns.
 
 If expressions with the "-path" operand are used in <findGeneralOps>, the
 placeholder ///d/ must (not should) be used in place of <sourceDir>/ and
-<backupDir>/ in the path patterns, unless, perhaps, the <sourceDir> and
+<backupDir>/ in their path patterns, unless, perhaps, the <sourceDir> and
 <backupDir> parts of the paths are matched by a FIND wildcard.
 
 Zaloha will replace ///d/ by the start point directory that is passed to FIND
@@ -1858,43 +1853,40 @@ BEGIN {
   gsub( QUOTEREGEX, QUOTEESC, outFile )
   cmd = "find '" startPoint "'"  # FIND command being constructed
   wrd = ""                       # word of FIND command being constructed
-  iwd = 0                        # flag inside of word
+  iwd = 0                        # flag inside of word (0=before, 1=in, 2=after)
   idq = 0                        # flag inside of double-quote
-  bsl = 0                        # flag backslash remembered
+  dqu = 0                        # flag double-quote remembered
   findOps = findOps " "
   for ( i = 1; i <= length( findOps ); i++ ) {
     c = substr( findOps, i, 1 )
-    if ( 1 == bsl ) {
-      bsl = 0
+    if ( 1 == dqu ) {
+      dqu = 0
       if ( DQUOTE == c ) {
         wrd = wrd c
         continue
       } else {
-        wrd = wrd BSLASH
+        idq = 0
       }
     }
-    if ( BSLASH == c ) {
-      iwd = 1
-      bsl = 1
-    } else if ( DQUOTE == c ) {
+    if ( DQUOTE == c ) {
       if ( 1 == idq ) {
-        idq = 0
+        dqu = 1
       } else {
+        iwd = 1
         idq = 1
       }
     } else if ( " " == c ) {
       if ( 1 == idq ) {
-        iwd = 1
         wrd = wrd c
-      } else {
-        iwd = 0
+      } else if ( 1 == iwd ) {
+        iwd = 2
       }
     } else {
-      iwd = 1
       wrd = wrd c
+      iwd = 1
     }
     # word boundary found: post-process word and add it to command
-    if (( 0 == iwd ) && ( "" != wrd )) {
+    if ( 2 == iwd ) {
       j = index( wrd, TRIPLETDSEP )
       if ( 0 != j ) {
         wpp = ""              # word of FIND command post-processed
@@ -1915,6 +1907,7 @@ BEGIN {
       gsub( QUOTEREGEX, QUOTEESC, wpp )
       cmd = cmd " '" wpp "'"
       wrd = ""
+      iwd = 0
     }
   }
   if ( 1 == idq ) {

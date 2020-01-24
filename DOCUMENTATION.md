@@ -624,74 +624,69 @@ The find command to debug this is:
 
     find &lt;sourceDir&gt; '(' -type f -a -name '*.tmp' ')' -o -printf 'path: %P\n'
 
+Beware of interpretation by your shell
+--------------------------------------
+Your shell might interpret certain special characters contained on the command
+line. Should these characters be passed to the called program (= Zaloha)
+uninterpreted, they must be quoted or escaped.
+
+The bash shell does not interpret any characters in strings quoted by single
+quotes. In strings quoted by double-quotes, the situation is more complex.
+
+Please see the respective shell documentation for more details.
+
 Parsing of FIND operands by Zaloha
 ----------------------------------
 &lt;findSourceOps&gt; and &lt;findGeneralOps&gt; are passed into Zaloha as single strings.
-Zaloha has to split these strings into individual words (operands) and pass
-these operands to FIND, each operand as a separate command line parameter.
-Zaloha has a special parser (AWKPARSER) to do this.
+Zaloha has to split these strings into individual operands (words) and pass them
+to FIND, each operand as a separate command line argument. Zaloha has a special
+parser (AWKPARSER) to do this.
 
-The easy case is when each separate word is a separate FIND operand. However,
-if a FIND operand contains a space, it must be enclosed in double-quotes ("),
-and if a FIND operand contains a double-quote itself, it must be escaped by a
-backslash (\").
+The trivial case is when each (space-delimited) word is a separate FIND operand.
+However, if a FIND operand contains spaces, it must be enclosed in double-quotes
+(") to be treated as one operand. Moreover, if a FIND operand contains
+double-quotes themselves, then it too must be enclosed in double-quotes (")
+and the original double-quotes must be escaped by second double-quotes ("").
 
-Beware of interaction with your shell - episode 1
--------------------------------------------------
-Your shell might interpret special characters contained on the command line,
-including the double-quotes (") and backslashes (\) mentioned above.
-
-If your shell is bash, the rules are:
-
- * If a string is enclosed in single quotes, nothing is interpreted within that
-   string, also no protection is needed for double-quotes and backslashes.
-
- * If a string is enclosed in double-quotes, both double-quotes and backslashes
-   within that string are interpreted and must be protected: double-quote as
-   \", and backslash as \\.
-
-Examples (both single-quoted and double-quoted versions):
+Examples (for bash for both single-quoted and double-quoted strings):
 
   * exclude all objects named Windows Security
   * exclude all objects named My "Secret" Things
 
     --findSourceOps='-name "Windows Security" -prune -o'
-    --findSourceOps='-name "My \"Secret\" Things" -prune -o'
+    --findSourceOps='-name "My ""Secret"" Things" -prune -o'
 
     --findSourceOps="-name \"Windows Security\" -prune -o"
-    --findSourceOps="-name \"My \\\"Secret\\\" Things\" -prune -o"
+    --findSourceOps="-name \"My \"\"Secret\"\" Things\" -prune -o"
 
 Interpretation of special characters by FIND itself
 ---------------------------------------------------
 In the patterns of the -path and -name expressions, FIND itself interprets
 following characters specially (see FIND documentation): *, ?, [, ], \.
 
-If these characters are to be taken literally, they must be backslash-escaped.
+If these characters are to be taken literally, they must be handed over to
+FIND backslash-escaped.
 
-Beware of interaction with your shell - episode 2
--------------------------------------------------
-An eventual backslash-escaping of *, ?, [, ], \ mentioned above makes a second
-episode of protection from shell interpretation necessary:
-
-Examples (both single-quoted and double-quoted versions):
+Examples (for bash for both single-quoted and double-quoted strings):
 
   * exclude all objects whose names begin with abcd (i.e. FIND pattern abcd*)
-  * exclude all objects named exactly abcd* (literally including the asterisk)
+  * exclude all objects named exactly mnop* (literally including the asterisk)
 
     --findSourceOps='-name abcd* -prune -o'
-    --findSourceOps='-name abcd\* -prune -o'
+    --findSourceOps='-name mnop\* -prune -o'
 
     --findSourceOps="-name abcd* -prune -o"
-    --findSourceOps="-name abcd\\* -prune -o"
+    --findSourceOps="-name mnop\\* -prune -o"
 
 The placeholder ///d/ for the start point directories
 -----------------------------------------------------
 If expressions with the "-path" operand are used in &lt;findSourceOps&gt;, the
-placeholder ///d/ should be used in place of &lt;sourceDir&gt;/ in the path patterns.
+placeholder ///d/ should be used in place of &lt;sourceDir&gt;/ in their path
+patterns.
 
 If expressions with the "-path" operand are used in &lt;findGeneralOps&gt;, the
 placeholder ///d/ must (not should) be used in place of &lt;sourceDir&gt;/ and
-&lt;backupDir&gt;/ in the path patterns, unless, perhaps, the &lt;sourceDir&gt; and
+&lt;backupDir&gt;/ in their path patterns, unless, perhaps, the &lt;sourceDir&gt; and
 &lt;backupDir&gt; parts of the paths are matched by a FIND wildcard.
 
 Zaloha will replace ///d/ by the start point directory that is passed to FIND
