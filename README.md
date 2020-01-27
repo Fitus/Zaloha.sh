@@ -26,6 +26,26 @@ Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" [other options, se
 ## Usage Screenshot
 ![Simple_Demo_screenshot](Simple_Demo_screenshot.png)
 
+## Performance data
+
+Performance was measured on following system and data:
+
+ * Standard commodity PC with Intel i3, 3.3GHz, 4GB RAM
+ * Source directory: local Seagate HDD 500GB, 7200rpm, SATA III
+ * Backup directory: a second local Seagate HDD 500GB, 7200rpm, SATA III
+ * Filesystem: ext4 on both HDDs
+ * Data synchronized: 110 GB, 88.000 files
+ * Operating system: Linux (Fedora 30)
+ * Binary utilities used by Zaloha: GNU find, GNU sort, mawk
+ * Zaloha options: --noRestore YES, --mawk YES, --hLinks NO, --byteByByte NO
+
+Measured performance of the analysis phase:
+ * first run: 25 seconds (filesystem data not cached in the OS)
+ * second run: 5 seconds (filesystem data cached in the OS)
+
+Performance of the execution phase:
+ * depends on how many files need synchronization: zero to several minutes
+
 ## Add-on shellscript Zaloha_Snapshot.sh
 
 An add-on shellscript to create hardlink-based snapshots of the backup directory exists: [Zaloha_Snapshot](https://github.com/Fitus/Zaloha_Snapshot.sh).
