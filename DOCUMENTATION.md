@@ -329,11 +329,19 @@ key variables for whole script are defined (and can be adjusted as needed).
     described in full detail in section FIND operands to control FIND commands
     invoked by Zaloha.
 
+    The <b>--findSourceOps</b> option can be passed in several times. In such case
+    the final &lt;findSourceOps&gt; will be the concatenation of the several
+    individual &lt;findSourceOps&gt; passed in with the options.
+
 <b>--findGeneralOps</b>=&lt;findGeneralOps&gt; are additional operands for the FIND commands
     that scan both &lt;sourceDir&gt; and &lt;backupDir&gt;, to be used to exclude "Trash"
     subdirectories, independently on where they exist, from Zaloha's scope.
     This is a complex topic, described in full detail in section FIND operands
     to control FIND commands invoked by Zaloha.
+
+    The <b>--findGeneralOps</b> option can be passed in several times. In such case
+    the final &lt;findGeneralOps&gt; will be the concatenation of the several
+    individual &lt;findGeneralOps&gt; passed in with the options.
 
 <b>--noExec</b>        ... needed if Zaloha is invoked automatically: do not ask,
     do not execute the actions, but still prepare the scripts. The prepared
@@ -528,6 +536,10 @@ The FIND scans of &lt;sourceDir&gt; and &lt;backupDir&gt; can be modified by two
 Option <b>--findSourceOps</b> are additional operands for the FIND command that scans
 &lt;sourceDir&gt; only, and the option <b>--findGeneralOps</b> are additional operands
 for both FIND commands (scans of both &lt;sourceDir&gt; and &lt;backupDir&gt;).
+
+Both options <b>--findSourceOps</b> and <b>--findGeneralOps</b> can be passed in several
+times. This allows to construct the final &lt;findSourceOps&gt; and &lt;findGeneralOps&gt;
+in Zaloha part-wise, e.g. expression by expression.
 
 Difference between &lt;findSourceOps&gt; and &lt;findGeneralOps&gt;
 -------------------------------------------------------
@@ -725,6 +737,10 @@ To extend (= combine, not replace) the internal default by own extension (note
 the plus (+) sign):
 
     --findGeneralOps=+&lt;your extension&gt;
+
+If several <b>--findGeneralOps</b> options are passed in, the plus (+) sign mentioned
+above should be passed in only with the first instance, not with the second,
+third (and so on) instances.
 
 Known traps and problems
 ------------------------

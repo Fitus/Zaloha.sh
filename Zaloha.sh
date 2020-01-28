@@ -354,11 +354,19 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     described in full detail in section FIND operands to control FIND commands
     invoked by Zaloha.
 
+    The "--findSourceOps" option can be passed in several times. In such case
+    the final <findSourceOps> will be the concatenation of the several
+    individual <findSourceOps> passed in with the options.
+
 --findGeneralOps=<findGeneralOps> are additional operands for the FIND commands
     that scan both <sourceDir> and <backupDir>, to be used to exclude "Trash"
     subdirectories, independently on where they exist, from Zaloha's scope.
     This is a complex topic, described in full detail in section FIND operands
     to control FIND commands invoked by Zaloha.
+
+    The "--findGeneralOps" option can be passed in several times. In such case
+    the final <findGeneralOps> will be the concatenation of the several
+    individual <findGeneralOps> passed in with the options.
 
 --noExec        ... needed if Zaloha is invoked automatically: do not ask,
     do not execute the actions, but still prepare the scripts. The prepared
@@ -552,6 +560,10 @@ The FIND scans of <sourceDir> and <backupDir> can be modified by two options:
 Option "--findSourceOps" are additional operands for the FIND command that scans
 <sourceDir> only, and the option "--findGeneralOps" are additional operands
 for both FIND commands (scans of both <sourceDir> and <backupDir>).
+
+Both options "--findSourceOps" and "--findGeneralOps" can be passed in several
+times. This allows to construct the final <findSourceOps> and <findGeneralOps>
+in Zaloha part-wise, e.g. expression by expression.
 
 Difference between <findSourceOps> and <findGeneralOps>
 -------------------------------------------------------
@@ -749,6 +761,10 @@ To extend (= combine, not replace) the internal default by own extension (note
 the plus (+) sign):
 
     --findGeneralOps=+<your extension>
+
+If several "--findGeneralOps" options are passed in, the plus (+) sign mentioned
+above should be passed in only with the first instance, not with the second,
+third (and so on) instances.
 
 Known traps and problems
 ------------------------
@@ -1249,6 +1265,12 @@ function error_exit {
 
 trap 'error_exit "Error on line ${LINENO}"' ERR
 
+function opt_dupli_check {
+  if [ ${1} -eq 1 ]; then
+    error_exit "Option ${2} passed in two or more times"
+  fi
+}
+
 function start_progress {
   if [ ${noProgress} -eq 0 ]; then
     echo -n "    ${1} ${DOTS60:1:$(( 53 - ${#1} ))}"
@@ -1329,9 +1351,12 @@ DOTS60="${BLANKS60// /.}"
 
 ###########################################################
 sourceDir=
+sourceDirPassed=0
 backupDir=
+backupDirPassed=0
 findSourceOps=
 findGeneralOps=
+findGeneralOpsPassed=0
 noExec=0
 noRemove=0
 revNew=0
@@ -1351,6 +1376,7 @@ pRevMode=0
 noRestore=0
 optimCSV=0
 metaDir=
+metaDirPassed=0
 noDirChecks=0
 noLastRun=0
 noFindSource=0
@@ -1376,50 +1402,50 @@ help=0
 for tmpVal in "${@}"
 do
   case "${tmpVal}" in
-    --sourceDir=*)       sourceDir="${tmpVal#*=}" ;;
-    --backupDir=*)       backupDir="${tmpVal#*=}" ;;
-    --findSourceOps=*)   findSourceOps="${tmpVal#*=}" ;;
-    --findGeneralOps=*)  findGeneralOps="M${tmpVal#*=}" ;;
-    --noExec)            noExec=1 ;;
-    --noRemove)          noRemove=1 ;;
-    --revNew)            revNew=1 ;;
-    --revUp)             revUp=1 ;;
-    --hLinks)            hLinks=1 ;;
-    --ok2s)              ok2s=1 ;;
-    --ok3600s)           ok3600s=1 ;;
-    --byteByByte)        byteByByte=1 ;;
-    --noUnlink)          noUnlink=1 ;;
-    --touch)             touch=1 ;;
-    --pUser)             pUser=1 ;;
-    --pGroup)            pGroup=1 ;;
-    --pMode)             pMode=1 ;;
-    --pRevUser)          pRevUser=1 ;;
-    --pRevGroup)         pRevGroup=1 ;;
-    --pRevMode)          pRevMode=1 ;;
-    --noRestore)         noRestore=1 ;;
-    --optimCSV)          optimCSV=1 ;;
-    --metaDir=*)         metaDir="M${tmpVal#*=}" ;;
-    --noDirChecks)       noDirChecks=1 ;;
-    --noLastRun)         noLastRun=1 ;;
-    --noFindSource)      noFindSource=1 ;;
-    --noFindBackup)      noFindBackup=1 ;;
-    --noExec1Hdr)        noExec1Hdr=1 ;;
-    --noExec2Hdr)        noExec2Hdr=1 ;;
-    --noExec3Hdr)        noExec3Hdr=1 ;;
-    --noExec4Hdr)        noExec4Hdr=1 ;;
-    --noExec5Hdr)        noExec5Hdr=1 ;;
-    --noR800Hdr)         noR800Hdr=1 ;;
-    --noR810Hdr)         noR810Hdr=1 ;;
-    --noR820Hdr)         noR820Hdr=1 ;;
-    --noR830Hdr)         noR830Hdr=1 ;;
-    --noR840Hdr)         noR840Hdr=1 ;;
-    --noR850Hdr)         noR850Hdr=1 ;;
-    --noR860Hdr)         noR860Hdr=1 ;;
-    --noProgress)        noProgress=1 ;;
-    --color)             color=1 ;;
-    --mawk)              mawk=1 ;;
-    --lTest)             lTest=1 ;;
-    --help)              help=1 ;;
+    --sourceDir=*)       opt_dupli_check ${sourceDirPassed} "${tmpVal%%=*}";  sourceDir="${tmpVal#*=}";  sourceDirPassed=1 ;;
+    --backupDir=*)       opt_dupli_check ${backupDirPassed} "${tmpVal%%=*}";  backupDir="${tmpVal#*=}";  backupDirPassed=1 ;;
+    --findSourceOps=*)   findSourceOps="${findSourceOps}${tmpVal#*=} " ;;
+    --findGeneralOps=*)  findGeneralOps="${findGeneralOps}${tmpVal#*=} ";  findGeneralOpsPassed=1 ;;
+    --noExec)            opt_dupli_check ${noExec} "${tmpVal}";        noExec=1 ;;
+    --noRemove)          opt_dupli_check ${noRemove} "${tmpVal}";      noRemove=1 ;;
+    --revNew)            opt_dupli_check ${revNew} "${tmpVal}";        revNew=1 ;;
+    --revUp)             opt_dupli_check ${revUp} "${tmpVal}";         revUp=1 ;;
+    --hLinks)            opt_dupli_check ${hLinks} "${tmpVal}";        hLinks=1 ;;
+    --ok2s)              opt_dupli_check ${ok2s} "${tmpVal}";          ok2s=1 ;;
+    --ok3600s)           opt_dupli_check ${ok3600s} "${tmpVal}";       ok3600s=1 ;;
+    --byteByByte)        opt_dupli_check ${byteByByte} "${tmpVal}";    byteByByte=1 ;;
+    --noUnlink)          opt_dupli_check ${noUnlink} "${tmpVal}";      noUnlink=1 ;;
+    --touch)             opt_dupli_check ${touch} "${tmpVal}";         touch=1 ;;
+    --pUser)             opt_dupli_check ${pUser} "${tmpVal}";         pUser=1 ;;
+    --pGroup)            opt_dupli_check ${pGroup} "${tmpVal}";        pGroup=1 ;;
+    --pMode)             opt_dupli_check ${pMode} "${tmpVal}";         pMode=1 ;;
+    --pRevUser)          opt_dupli_check ${pRevUser} "${tmpVal}";      pRevUser=1 ;;
+    --pRevGroup)         opt_dupli_check ${pRevGroup} "${tmpVal}";     pRevGroup=1 ;;
+    --pRevMode)          opt_dupli_check ${pRevMode} "${tmpVal}";      pRevMode=1 ;;
+    --noRestore)         opt_dupli_check ${noRestore} "${tmpVal}";     noRestore=1 ;;
+    --optimCSV)          opt_dupli_check ${optimCSV} "${tmpVal}";      optimCSV=1 ;;
+    --metaDir=*)         opt_dupli_check ${metaDirPassed} "${tmpVal%%=*}";  metaDir="${tmpVal#*=}";  metaDirPassed=1 ;;
+    --noDirChecks)       opt_dupli_check ${noDirChecks} "${tmpVal}";   noDirChecks=1 ;;
+    --noLastRun)         opt_dupli_check ${noLastRun} "${tmpVal}";     noLastRun=1 ;;
+    --noFindSource)      opt_dupli_check ${noFindSource} "${tmpVal}";  noFindSource=1 ;;
+    --noFindBackup)      opt_dupli_check ${noFindBackup} "${tmpVal}";  noFindBackup=1 ;;
+    --noExec1Hdr)        opt_dupli_check ${noExec1Hdr} "${tmpVal}";    noExec1Hdr=1 ;;
+    --noExec2Hdr)        opt_dupli_check ${noExec2Hdr} "${tmpVal}";    noExec2Hdr=1 ;;
+    --noExec3Hdr)        opt_dupli_check ${noExec3Hdr} "${tmpVal}";    noExec3Hdr=1 ;;
+    --noExec4Hdr)        opt_dupli_check ${noExec4Hdr} "${tmpVal}";    noExec4Hdr=1 ;;
+    --noExec5Hdr)        opt_dupli_check ${noExec5Hdr} "${tmpVal}";    noExec5Hdr=1 ;;
+    --noR800Hdr)         opt_dupli_check ${noR800Hdr} "${tmpVal}";     noR800Hdr=1 ;;
+    --noR810Hdr)         opt_dupli_check ${noR810Hdr} "${tmpVal}";     noR810Hdr=1 ;;
+    --noR820Hdr)         opt_dupli_check ${noR820Hdr} "${tmpVal}";     noR820Hdr=1 ;;
+    --noR830Hdr)         opt_dupli_check ${noR830Hdr} "${tmpVal}";     noR830Hdr=1 ;;
+    --noR840Hdr)         opt_dupli_check ${noR840Hdr} "${tmpVal}";     noR840Hdr=1 ;;
+    --noR850Hdr)         opt_dupli_check ${noR850Hdr} "${tmpVal}";     noR850Hdr=1 ;;
+    --noR860Hdr)         opt_dupli_check ${noR860Hdr} "${tmpVal}";     noR860Hdr=1 ;;
+    --noProgress)        opt_dupli_check ${noProgress} "${tmpVal}";    noProgress=1 ;;
+    --color)             opt_dupli_check ${color} "${tmpVal}";         color=1 ;;
+    --mawk)              opt_dupli_check ${mawk} "${tmpVal}";          mawk=1 ;;
+    --lTest)             opt_dupli_check ${lTest} "${tmpVal}";         lTest=1 ;;
+    --help)              opt_dupli_check ${help} "${tmpVal}";          help=1 ;;
     *) error_exit "Unknown option ${tmpVal}, get help via Zaloha.sh --help" ;;
   esac
 done
@@ -1534,14 +1560,12 @@ findSourceOpsEsc="${findSourceOpsEsc//${NLINE}/${TRIPLETN}}"
 
 ###########################################################
 findGeneralOpsInternal=
-findGeneralOpsInternal="${findGeneralOpsInternal} -ipath ${TRIPLETDSEP}\$RECYCLE.BIN -prune -o"
-findGeneralOpsInternal="${findGeneralOpsInternal} -path ${TRIPLETDSEP}.Trash-[0-9]* -prune -o"
-findGeneralOpsInternal="${findGeneralOpsInternal} -path ${TRIPLETDSEP}lost+found -prune -o"
-if [ "M+" == "${findGeneralOps:0:2}" ]; then
-  findGeneralOps="${findGeneralOpsInternal} ${findGeneralOps:2}"
-elif [ "M" == "${findGeneralOps:0:1}" ]; then
-  findGeneralOps="${findGeneralOps:1}"
-else
+findGeneralOpsInternal="${findGeneralOpsInternal}-ipath ${TRIPLETDSEP}\$RECYCLE.BIN -prune -o "
+findGeneralOpsInternal="${findGeneralOpsInternal}-path ${TRIPLETDSEP}.Trash-[0-9]* -prune -o "
+findGeneralOpsInternal="${findGeneralOpsInternal}-path ${TRIPLETDSEP}lost+found -prune -o "
+if [ "+" == "${findGeneralOps:0:1}" ]; then
+  findGeneralOps="${findGeneralOpsInternal} ${findGeneralOps:1}"
+elif [ ${findGeneralOpsPassed} -eq 0 ]; then
   findGeneralOps="${findGeneralOpsInternal}"
 fi
 tmpVal="${findGeneralOps//${TRIPLETDSEP}/M}"
@@ -1555,12 +1579,8 @@ findGeneralOpsEsc="${findGeneralOpsEsc//${NLINE}/${TRIPLETN}}"
 ###########################################################
 metaDirInternalBase=".Zaloha_metadata"
 metaDirInternal="${backupDir}${metaDirInternalBase}"
-if [ "M" == "${metaDir:0:1}" ]; then
-  metaDir="${metaDir:1}"
-  metaDirDefault=0
-else
+if [ ${metaDirPassed} -eq 0 ]; then
   metaDir="${metaDirInternal}"
-  metaDirDefault=1
 fi
 if [ "" == "${metaDir}" ]; then
   error_exit "<metaDir> is mandatory if --metaDir option is given"
@@ -1588,7 +1608,7 @@ findLastRunOpsFinalAwk="-path ${TRIPLETDSEP}${f999Base}"
 findSourceOpsFinalAwk="${findGeneralOpsAwk} ${findSourceOpsAwk}"
 findBackupOpsFinalAwk="${findGeneralOpsAwk}"
 
-if [ ${metaDirDefault} -eq 1 ]; then
+if [ ${metaDirPassed} -eq 0 ]; then
   findSourceOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findSourceOpsFinalAwk}"
   findBackupOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findBackupOpsFinalAwk}"
 fi
@@ -1683,6 +1703,7 @@ ${TRIPLET}${FSTAB}findSourceOpsEsc${FSTAB}${findSourceOpsEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findGeneralOps${FSTAB}${findGeneralOps}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findGeneralOpsAwk${FSTAB}${findGeneralOpsAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}findGeneralOpsEsc${FSTAB}${findGeneralOpsEsc}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}findGeneralOpsPassed${FSTAB}${findGeneralOpsPassed}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec${FSTAB}${noExec}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noRemove${FSTAB}${noRemove}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}revNew${FSTAB}${revNew}${FSTAB}${TRIPLET}
@@ -1704,8 +1725,8 @@ ${TRIPLET}${FSTAB}optimCSV${FSTAB}${optimCSV}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDir${FSTAB}${metaDir}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirAwk${FSTAB}${metaDirAwk}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirPattAwk${FSTAB}${metaDirPattAwk}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}metaDirDefault${FSTAB}${metaDirDefault}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirEsc${FSTAB}${metaDirEsc}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}metaDirPassed${FSTAB}${metaDirPassed}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noDirChecks${FSTAB}${noDirChecks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noLastRun${FSTAB}${noLastRun}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindSource${FSTAB}${noFindSource}${FSTAB}${TRIPLET}
