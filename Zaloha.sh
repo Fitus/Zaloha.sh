@@ -68,7 +68,9 @@ No writing on either directory may occur while Zaloha runs (no file locking is
 implemented). In demanding IT operations where backup must run concurrently with
 writing, a higher class of backup solution should be deployed, like storage
 snapshots (i.e. functionality that must be supported by the underlying
-OS/hardware).
+OS/hardware). If either directory contains data files of running databases, then
+they must be excluded from backups on file level, and database backups must be
+implemented by dedicated solutions provided by the database vendor.
 
 Handling of "weird" characters in filenames was a special focus during
 development of Zaloha (details below).
@@ -631,11 +633,20 @@ Further, the internal logic of Zaloha imposes the following limitations:
 
     --findGeneralOps='( -type f -a -name core ) -o'
 
+   Note 1: GNU find supports the -ipath and -iname operands for case-insensitive
+   matching of paths and names. They fulfill the above described "both or none"
+   criterion as well and hence are allowed too. The same holds for the -regex
+   and -iregex operands supported by GNU find, as they act on paths as well.
+
+   Note 2: As <findGeneralOps> act on both <sourceDir> and <backupDir> and the
+   paths differ in the start point directories, the placeholder ///d/ must be
+   used in the involved path patterns. This is described further below.
+
  * Exclusion of subdirectories by the "--findGeneralOps" option: Both above
    described limitations must be obeyed: Only expressions with -path or -name
    operands are allowed, and if subdirectories are excluded, all their contents
-   must be excluded too. Example: exclude subdirectories lost+found wherever
-   they exist:
+   must be excluded too. Notes 1 and 2 from previous bullet hold too.
+   Example: exclude subdirectories lost+found wherever they exist:
 
     --findGeneralOps='( -type d -a -name lost+found ) -prune -o'
 
@@ -919,6 +930,20 @@ directory is needed as well, it should be solved separately (Hint: if the
 secondary backup starts one directory higher, then .Zaloha_metadata of the
 original backup will be taken).
 
+Corner case FAT uppercase conversions: The widespread FAT filesystem has been
+already mentioned as a source of challenges. Here is another one: The source
+directory is on a Linux ext4 filesystem and contains the files SOUBOR.TXT,
+SOUBOR.txt, soubor.TXT and soubor.txt in one of the subdirectories. The backup
+directory is on a FAT-formatted USB flash drive. The synchronization executes
+without visible problems, but in the backup directory, only SOUBOR.TXT exists.
+What happened is that the OS/filesystem re-directed all four copy operations
+into SOUBOR.TXT. Also, after three overwrites, the backup of only one of the
+four source files exists. Zaloha detects this situation on next synchronization
+and prepares new copy commands, but they again hit the same problem. The only
+effective solution seems to be the renaming of the source files to avoid this
+type of name conflict. Last note: A similar phenomenon has been observed in the
+Cygwin environment running on Windows/ntfs too.
+
 ###########################################################
 
 HOW ZALOHA WORKS INTERNALLY
@@ -1011,8 +1036,8 @@ Handling of "weird" characters in filenames was a special focus during
 development of Zaloha. Actually, it was an exercise of how far can be gone with
 shellscript alone, without reverting to a C program. Tested were:
 !"#$%&'()*+,-.:;<=>?@[\]^`{|}~, spaces, tabs, newlines, alert (bell) and
-a few national characters (beyond ASCII 127). Please note that on some
-filesystem types, some weird characters are not allowed at all.
+a few national characters (beyond ASCII 127). Please note that some filesystem
+types and operating systems do not permit some of these weird characters at all.
 
 Zaloha internally uses tab-separated CSV files, also tabs and newlines are major
 disruptors. The solution is based on the following idea: POSIX (the most
@@ -1559,14 +1584,14 @@ findSourceOpsEsc="${findSourceOps//${TAB}/${TRIPLETT}}"
 findSourceOpsEsc="${findSourceOpsEsc//${NLINE}/${TRIPLETN}}"
 
 ###########################################################
-findGeneralOpsInternal=
-findGeneralOpsInternal="${findGeneralOpsInternal}-ipath ${TRIPLETDSEP}\$RECYCLE.BIN -prune -o "
-findGeneralOpsInternal="${findGeneralOpsInternal}-path ${TRIPLETDSEP}.Trash-[0-9]* -prune -o "
-findGeneralOpsInternal="${findGeneralOpsInternal}-path ${TRIPLETDSEP}lost+found -prune -o "
+findGeneralOpsDefault=
+findGeneralOpsDefault="${findGeneralOpsDefault}-ipath ${TRIPLETDSEP}\$RECYCLE.BIN -prune -o "
+findGeneralOpsDefault="${findGeneralOpsDefault}-path ${TRIPLETDSEP}.Trash-[0-9]* -prune -o "
+findGeneralOpsDefault="${findGeneralOpsDefault}-path ${TRIPLETDSEP}lost+found -prune -o "
 if [ "+" == "${findGeneralOps:0:1}" ]; then
-  findGeneralOps="${findGeneralOpsInternal} ${findGeneralOps:1}"
+  findGeneralOps="${findGeneralOpsDefault} ${findGeneralOps:1}"
 elif [ ${findGeneralOpsPassed} -eq 0 ]; then
-  findGeneralOps="${findGeneralOpsInternal}"
+  findGeneralOps="${findGeneralOpsDefault}"
 fi
 tmpVal="${findGeneralOps//${TRIPLETDSEP}/M}"
 if [ "${tmpVal/${TRIPLET}/}" != "${tmpVal}" ]; then
@@ -1577,10 +1602,10 @@ findGeneralOpsEsc="${findGeneralOps//${TAB}/${TRIPLETT}}"
 findGeneralOpsEsc="${findGeneralOpsEsc//${NLINE}/${TRIPLETN}}"
 
 ###########################################################
-metaDirInternalBase=".Zaloha_metadata"
-metaDirInternal="${backupDir}${metaDirInternalBase}"
+metaDirDefaultBase=".Zaloha_metadata"
+metaDirDefault="${backupDir}${metaDirDefaultBase}"
 if [ ${metaDirPassed} -eq 0 ]; then
-  metaDir="${metaDirInternal}"
+  metaDir="${metaDirDefault}"
 fi
 if [ "" == "${metaDir}" ]; then
   error_exit "<metaDir> is mandatory if --metaDir option is given"
@@ -1609,8 +1634,8 @@ findSourceOpsFinalAwk="${findGeneralOpsAwk} ${findSourceOpsAwk}"
 findBackupOpsFinalAwk="${findGeneralOpsAwk}"
 
 if [ ${metaDirPassed} -eq 0 ]; then
-  findSourceOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findSourceOpsFinalAwk}"
-  findBackupOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirInternalBase} -prune -o ${findBackupOpsFinalAwk}"
+  findSourceOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirDefaultBase} -prune -o ${findSourceOpsFinalAwk}"
+  findBackupOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirDefaultBase} -prune -o ${findBackupOpsFinalAwk}"
 fi
 
 ###########################################################
