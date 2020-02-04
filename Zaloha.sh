@@ -475,6 +475,14 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
                     distinction of operations on files newer than the last run
                     of Zaloha (e.g. distinction between UPDATE.! and UPDATE).
 
+--noIdentCheck  ... do not check if objects on identical paths in <sourceDir>
+                    and <backupDir> are identical (= identical inodes). This
+                    check brings to attention cases where objects in <sourceDir>
+                    and corresponding objects in <backupDir> are in reality
+                    the same objects (possibly via hardlinks), which violates
+                    the logic of backup. Switching off this check might be
+                    necessary in some special uses of Zaloha.
+
 --noFindSource  ... do not run FIND (script 210) to scan <sourceDir>
                     and use externally supplied CSV metadata file 310 instead
 --noFindBackup  ... do not run FIND (script 220) to scan <backupDir>
@@ -1404,6 +1412,7 @@ metaDir=
 metaDirPassed=0
 noDirChecks=0
 noLastRun=0
+noIdentCheck=0
 noFindSource=0
 noFindBackup=0
 noExec1Hdr=0
@@ -1452,6 +1461,7 @@ do
     --metaDir=*)         opt_dupli_check ${metaDirPassed} "${tmpVal%%=*}";  metaDir="${tmpVal#*=}";  metaDirPassed=1 ;;
     --noDirChecks)       opt_dupli_check ${noDirChecks} "${tmpVal}";   noDirChecks=1 ;;
     --noLastRun)         opt_dupli_check ${noLastRun} "${tmpVal}";     noLastRun=1 ;;
+    --noIdentCheck)      opt_dupli_check ${noIdentCheck} "${tmpVal}";  noIdentCheck=1 ;;
     --noFindSource)      opt_dupli_check ${noFindSource} "${tmpVal}";  noFindSource=1 ;;
     --noFindBackup)      opt_dupli_check ${noFindBackup} "${tmpVal}";  noFindBackup=1 ;;
     --noExec1Hdr)        opt_dupli_check ${noExec1Hdr} "${tmpVal}";    noExec1Hdr=1 ;;
@@ -1754,6 +1764,7 @@ ${TRIPLET}${FSTAB}metaDirEsc${FSTAB}${metaDirEsc}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDirPassed${FSTAB}${metaDirPassed}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noDirChecks${FSTAB}${noDirChecks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noLastRun${FSTAB}${noLastRun}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noIdentCheck${FSTAB}${noIdentCheck}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindSource${FSTAB}${noFindSource}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noFindBackup${FSTAB}${noFindBackup}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noExec1Hdr${FSTAB}${noExec1Hdr}${FSTAB}${TRIPLET}
@@ -1796,8 +1807,10 @@ BEGIN {
         "  }\n"                                                             \
         "}"
   war = "function warning( msg ) {\n"                                       \
-        "  print \"\\nZaloha AWK: Warning: \" msg > \"/dev/stderr\"\n"      \
-        "  close( \"/dev/stderr\" )\n"                                      \
+        "  if ( \"\" == error_exit_filename ) {\n"                          \
+        "    print \"\\nZaloha AWK: Warning: \" msg > \"/dev/stderr\"\n"    \
+        "    close( \"/dev/stderr\" )\n"                                    \
+        "  }\n"                                                             \
         "}"
   mpa = 8     # MAXPARALLEL constant
 }
@@ -2341,6 +2354,8 @@ BEGIN {
   xrn = ""    # occupied namespace for REV.NEW
   xkp = ""    # occupied namespace for objects to KEEP only on <backupDir>
   prr = 0     # flag previous record remembered (= unprocessed)
+  idc = 0     # count of identical object(s) (inodes) on <sourceDir> and <backupDir>
+  idp = ""    # path of first identical object (inode) on <sourceDir> and <backupDir>
   if ( 1 == ok3600s ) {
     tof = 3600     # tolerated offset +/- 3600 seconds
   } else {
@@ -2482,6 +2497,14 @@ function process_previous_record() {
   } else {
     if ( 1 == prr ) {
       if ( pt == $13 ) {                       ### same name on <sourceDir> and <backupDir>
+        if (( 0 == noIdentCheck )                              \
+         && ( $7 !~ ZEROREGEX ) && (( "M" dv ) == ( "M" $7 ))  \
+         && ( $8 !~ ZEROREGEX ) && (( "M" id ) == ( "M" $8 ))) {
+           if ( 0 == idc ) {
+             idp = pt
+           }
+           idc = idc + 1
+        }
         if ( "d" == $3 ) {                     ## directory on <sourceDir>
           if ( "d" == tp ) {                   # directory on <sourceDir>, directory on <backupDir> (case 1)
             attributes_or_ok()
@@ -2575,6 +2598,15 @@ END {
   if ( 1 == prr ) {
     process_previous_record()
   }
+  if ( 0 != idc ) {
+    if ( "" == idp ) {
+      warning( idc " identical object(s) (inodes) on <sourceDir> and <backupDir>, first are <sourceDir> and <backupDir> themselves" )
+    } else {
+      gsub( TRIPLETSREGEX, SLASH, idp )
+      idp = substr( idp, 1, length( idp ) - 1 )
+      warning( idc " identical object(s) (inodes) on <sourceDir> and <backupDir>, path of first case: " idp )
+    }
+  }
   if (( 0 == noLastRun ) && ( 0 == lru )) {
     warning( "No last run of Zaloha found (this is OK if this is the first run)" )
   }
@@ -2593,17 +2625,18 @@ stop_progress
 
 start_progress "Differences processing"
 
-${awk} -f "${f170}"               \
-       -v noRemove=${noRemove}    \
-       -v revNew=${revNew}        \
-       -v revUp=${revUp}          \
-       -v ok2s=${ok2s}            \
-       -v ok3600s=${ok3600s}      \
-       -v noUnlink=${noUnlink}    \
-       -v pUser=${pUser}          \
-       -v pGroup=${pGroup}        \
-       -v pMode=${pMode}          \
-       -v noLastRun=${noLastRun}  \
+${awk} -f "${f170}"                     \
+       -v noRemove=${noRemove}          \
+       -v revNew=${revNew}              \
+       -v revUp=${revUp}                \
+       -v ok2s=${ok2s}                  \
+       -v ok3600s=${ok3600s}            \
+       -v noUnlink=${noUnlink}          \
+       -v pUser=${pUser}                \
+       -v pGroup=${pGroup}              \
+       -v pMode=${pMode}                \
+       -v noLastRun=${noLastRun}        \
+       -v noIdentCheck=${noIdentCheck}  \
        "${fLastRun}" "${f370}"    > "${f380}"
 
 optim_csv_after_use "${f370}"

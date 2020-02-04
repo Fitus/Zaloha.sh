@@ -450,6 +450,14 @@ key variables for whole script are defined (and can be adjusted as needed).
                     distinction of operations on files newer than the last run
                     of Zaloha (e.g. distinction between <b>UPDATE.!</b> and <b>UPDATE</b>).
 
+<b>--noIdentCheck</b>  ... do not check if objects on identical paths in &lt;sourceDir&gt;
+                    and &lt;backupDir&gt; are identical (= identical inodes). This
+                    check brings to attention cases where objects in &lt;sourceDir&gt;
+                    and corresponding objects in &lt;backupDir&gt; are in reality
+                    the same objects (possibly via hardlinks), which violates
+                    the logic of backup. Switching off this check might be
+                    necessary in some special uses of Zaloha.
+
 <b>--noFindSource</b>  ... do not run FIND (script 210) to scan &lt;sourceDir&gt;
                     and use externally supplied CSV metadata file 310 instead
 <b>--noFindBackup</b>  ... do not run FIND (script 220) to scan &lt;backupDir&gt;
