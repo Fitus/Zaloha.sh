@@ -98,37 +98,36 @@ RMDIR     regular remove directory from <backupDir>
 REMOVE    regular remove file from <backupDir>
 REMOVE.!  remove file from <backupDir> which is newer than the
           last run of Zaloha
-REMOVE.x  remove other object on <backupDir> that occupies needed namespace,
-          x = object type (l/p/s/c/b/D)
+REMOVE.x  remove other object in <backupDir>, x = object type (l/p/s/c/b/D)
 
-Exec2:  copy files/directories to <backupDir> which exist only on <sourceDir>,
-        or files which are newer on <sourceDir>
+Exec2:  copy files/directories to <backupDir> which exist only in <sourceDir>,
+        or files which are newer in <sourceDir>
 -----------------------------------
-MKDIR     regular create new directory on <backupDir>
-NEW       regular create new file on <backupDir>
-UPDATE    regular update file on <backupDir>
-UPDATE.!  update file on <backupDir> which is newer than the last run of Zaloha
-UPDATE.?  update file on <backupDir> by a file on <sourceDir> which is not newer
+MKDIR     regular create new directory in <backupDir>
+NEW       regular create new file in <backupDir>
+UPDATE    regular update file in <backupDir>
+UPDATE.!  update file in <backupDir> which is newer than the last run of Zaloha
+UPDATE.?  update file in <backupDir> by a file in <sourceDir> which is not newer
           (or not newer by 3600 secs if option "--ok3600s" is given plus
            eventual 2 secs FAT tolerance)
-unl.UP    unlink file on <backupDir> + UPDATE (can be switched off via the
+unl.UP    unlink file in <backupDir> + UPDATE (can be switched off via the
           "--noUnlink" option, see below)
-unl.UP.!  unlink file on <backupDir> + UPDATE.! (can be switched off via the
+unl.UP.!  unlink file in <backupDir> + UPDATE.! (can be switched off via the
           "--noUnlink" option, see below)
-unl.UP.?  unlink file on <backupDir> + UPDATE.? (can be switched off via the
+unl.UP.?  unlink file in <backupDir> + UPDATE.? (can be switched off via the
           "--noUnlink" option, see below)
-ATTR:ugm  update only attributes on <backupDir> (u=user ownership,
+ATTR:ugm  update only attributes in <backupDir> (u=user ownership,
           g=group ownership, m=mode) (optional feature, see below)
 
 Exec3:  reverse-synchronization from <backupDir> to <sourceDir> (optional
         feature, can be activated via the "--revNew" and "--revUp" options)
 -----------------------------------
-REV.MKDI  reverse-create parent directory on <sourceDir> due to REV.NEW
-REV.NEW   reverse-create file on <sourceDir> (if a standalone file on
+REV.MKDI  reverse-create parent directory in <sourceDir> due to REV.NEW
+REV.NEW   reverse-create file in <sourceDir> (if a standalone file in
           <backupDir> is newer than the last run of Zaloha)
-REV.UP    reverse-update file on <sourceDir> (if the file on <backupDir>
-          is newer than the file on <sourceDir>)
-REV.UP.!  reverse-update file on <sourceDir> which is newer
+REV.UP    reverse-update file in <sourceDir> (if the file in <backupDir>
+          is newer than the file in <sourceDir>)
+REV.UP.!  reverse-update file in <sourceDir> which is newer
           than the last run of Zaloha (or newer than the last run of Zaloha
           minus 3600 secs if option "--ok3600s" is given)
 
@@ -139,24 +138,23 @@ RMDIR     regular remove directory from <backupDir>
 REMOVE    regular remove file from <backupDir>
 REMOVE.!  remove file from <backupDir> which is newer than the
           last run of Zaloha
-REMOVE.x  remove other object on <backupDir> that occupies needed namespace,
-          x = object type (l/p/s/c/b/D)
+REMOVE.x  remove other object in <backupDir>, x = object type (l/p/s/c/b/D)
 
 Exec5:  updates resulting from optional "byte by byte" comparing of files
         (optional feature, can be activated via the "--byteByByte" option)
 -----------------------------------
-UPDATE.b  update file on <backupDir> because it is not identical byte by byte
-unl.UP.b  unlink file on <backupDir> + UPDATE.b (can be switched off via the
+UPDATE.b  update file in <backupDir> because it is not identical byte by byte
+unl.UP.b  unlink file in <backupDir> + UPDATE.b (can be switched off via the
           "--noUnlink" option, see below)
 
 (internal use, for completion only)
 -----------------------------------
-OK        object without needed action on <sourceDir> (either files or
+OK        object without needed action in <sourceDir> (either files or
           directories already synchronized with <backupDir>, or other objects
           not to be synchronized to <backupDir>). These records are necessary
           for preparation of shellscripts for the case of restore.
 OK.b      file proven identical byte by byte (in CSV metadata file 555)
-KEEP      object to be kept only on <backupDir>
+KEEP      object to be kept only in <backupDir>
 uRMDIR    unavoidable RMDIR which goes into Exec1 (in CSV files 380 and 390)
 uREMOVE   unavoidable REMOVE which goes into Exec1 (in CSV files 380 and 390)
 
@@ -167,19 +165,19 @@ Exec1:
 ------
 Unavoidable removals from <backupDir> (objects of conflicting types which occupy
 needed namespace). This must be the first step, because objects of conflicting
-types on <backupDir> would prevent synchronization (e.g. a file cannot overwrite
+types in <backupDir> would prevent synchronization (e.g. a file cannot overwrite
 a directory).
 
 Unavoidable removals are prepared regardless of the "--noRemove" option.
 
 Exec2:
 ------
-Files and directories which exist only on <sourceDir> are copied to <backupDir>
+Files and directories which exist only in <sourceDir> are copied to <backupDir>
 (action codes NEW and MKDIR).
 
-Zaloha "updates" the file on <backupDir> (action code UPDATE) if the same file
-exists on both <sourceDir> and <backupDir> and the comparisons of file size and
-modification time indicate the necessity of this "update". If the file on
+Zaloha "updates" the file in <backupDir> (action code UPDATE) if the same file
+exists in both <sourceDir> and <backupDir> and the comparisons of file size and
+modification time indicate the necessity of this "update". If the file in
 <backupDir> is multiply linked (hardlinked), Zaloha removes (unlinks) it first,
 to prevent "updating" a multiply linked file, which could lead to follow-up
 effects (action code unl.UP). This unlinking can be switched off via the
@@ -190,7 +188,7 @@ m=mode), and attribute synchronization is switched on via the "--pUser",
 "--pGroup" and "--pMode" options, then only these attributes will be
 synchronized (action code ATTR). However, this is an optional feature, because:
 (1) the filesystem of <backupDir> might not be capable of storing these
-attributes, or (2) it may be wanted that all files and directories on
+attributes, or (2) it may be wanted that all files and directories in
 <backupDir> are owned by the user who runs Zaloha.
 
 Regardless of whether these attributes are synchronized or not, an eventual
@@ -198,11 +196,8 @@ restore of <sourceDir> from <backupDir> including these attributes is possible
 thanks to the restore scripts which Zaloha prepares in its metadata directory
 (see below).
 
-Symbolic links on <sourceDir> are neither followed nor synchronized to
-<backupDir>, but Zaloha prepares a restore script in its metadata directory.
-
 Zaloha contains an optional feature to detect multiply linked (hardlinked) files
-on <sourceDir>. If this feature is switched on (via the "--hLinks" option),
+in <sourceDir>. If this feature is switched on (via the "--hLinks" option),
 Zaloha internally flags the second, third, etc. links to same file as
 "hardlinks", and synchronizes to <backupDir> only the first link (the "file").
 The "hardlinks" are not synchronized to <backupDir>, but Zaloha prepares a
@@ -219,7 +214,10 @@ hardlinks (see code of AWKHLINKS). Generally, use this feature only after proper
 testing on your filesystems. Be cautious as inode-related issues exist on some
 filesystems and network-mounted filesystems.
 
-Zaloha does not synchronize other types of objects on <sourceDir> (named pipes,
+Symbolic links in <sourceDir> are neither followed nor synchronized to
+<backupDir>, but Zaloha prepares a restore script in its metadata directory.
+
+Zaloha does not synchronize other types of objects in <sourceDir> (named pipes,
 sockets, special devices, etc). These objects are considered to be part of the
 operating system or parts of applications, and dedicated scripts for their
 (re-)creation should exist.
@@ -241,21 +239,21 @@ That work should be "reverse-synchronized" from the Linux server (<backupDir>)
 back to the Windows notebook (<sourceDir>) (of course, assumed that there is no
 conflict between the work on the notebook and the work on the server).
 
-REV.NEW: If a standalone file on <backupDir> is newer than the last run of
+REV.NEW: If a standalone file in <backupDir> is newer than the last run of
 Zaloha, and the "--revNew" option is given, then Zaloha reverse-copies that file
 to <sourceDir> (REV.NEW) including all necessary parent directories (REV.MKDI).
 
-REV.UP: If the same file exists on both <sourceDir> and <backupDir>, and the
-file on <backupDir> is newer, and the "--revUp" option is given, then Zaloha
-uses that file to reverse-update the older file on <sourceDir> (REV.UP).
+REV.UP: If the same file exists in both <sourceDir> and <backupDir>, and the
+file in <backupDir> is newer, and the "--revUp" option is given, then Zaloha
+uses that file to reverse-update the older file in <sourceDir> (REV.UP).
 
 Optionally, to preserve attributes during the REV.MKDI, REV.NEW and REV.UP
 operations: use options "--pRevUser", "--pRevGroup" and "--pRevMode".
 
 If reverse-synchronization is not active: If no "--revNew" option is given,
-then each standalone file on <backupDir> is considered obsolete (and removed,
+then each standalone file in <backupDir> is considered obsolete (and removed,
 unless the "--noRemove" option is given). If no "--revUp" option is given, then
-files on <sourceDir> always update files on <backupDir> if they differ.
+files in <sourceDir> always update files in <backupDir> if they differ.
 
 Reverse-synchronization to <sourceDir> increases the overall complexity of the
 solution. Use it only in the interactive regime of Zaloha, where human oversight
@@ -270,7 +268,7 @@ This function can be switched off via the "--noRemove" option.
 Why are removals from <backupDir> split into two steps (Exec1 and Exec4)?
 The unavoidable removals must unconditionally occur first, also in Exec1 step.
 But what about the remaining (avoidable) removals: Imagine a scenario when a
-directory is renamed on <sourceDir>: If all removals were executed in Exec1,
+directory is renamed in <sourceDir>: If all removals were executed in Exec1,
 then <backupDir> would transition through a state (namely between Exec1 and
 Exec2) when the backup copy of the directory is already removed (under the old
 name), but not yet created (under the new name). To minimize the chance for such
@@ -284,7 +282,7 @@ massive copying followed by massive removing.
 
 Exec5:
 ------
-Zaloha updates files on <backupDir> for which the optional "byte by byte"
+Zaloha updates files in <backupDir> for which the optional "byte by byte"
 comparing revealed that they are in fact not identical (despite appearing
 identical by looking at their file sizes and modification times).
 
@@ -378,24 +376,24 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
     different from the interactive regime, where scripts are traced and halt
     on the first error.
 
---noRemove      ... do not remove files and directories which exist only
-    on <backupDir>. This option is useful in situations like that <sourceDir>
-    holds only "current" files but <backupDir> holds "current" plus
-    "historical" files.
+--noRemove      ... do not remove files, directories and symbolic links that
+    are standalone in <backupDir>. This option is useful when <backupDir> should
+    hold "current" plus "historical" data whereas <sourceDir> holds only
+    "current" data.
 
-    Please keep in mind that if objects of conflicting types on <backupDir>
+    Please keep in mind that if objects of conflicting types in <backupDir>
     prevent synchronization (e.g. a file cannot overwrite a directory),
     removals are unavoidable and will be prepared regardless of this option.
     In such case Zaloha displays a warning message in the interactive regime.
     In automatic operations, the calling process should query the CSV metadata
     file 510 to detect this case.
 
---revNew        ... enable REV.NEW (= if standalone file on <backupDir> is
+--revNew        ... enable REV.NEW (= if standalone file in <backupDir> is
                     newer than the last run of Zaloha, reverse-copy it
                     to <sourceDir>)
 
---revUp         ... enable REV.UP (= if file on <backupDir> is newer than
-                    file on <sourceDir>, reverse-update the file on <sourceDir>)
+--revUp         ... enable REV.UP (= if file in <backupDir> is newer than
+                    file in <sourceDir>, reverse-update the file in <sourceDir>)
 
 --hLinks        ... perform hardlink detection (inode-deduplication)
                     on <sourceDir>
@@ -418,19 +416,19 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
                     If additional updates of files result from this comparison,
                     they will be executed in step Exec5.
 
---noUnlink      ... never unlink multiply linked files on <backupDir> before
+--noUnlink      ... never unlink multiply linked files in <backupDir> before
                     writing to them
 
 --touch         ... use cp + touch instead of cp --preserve=timestamps
                     (explained in Special Cases section below)
 
---pUser         ... synchronize user ownerships on <backupDir>
+--pUser         ... synchronize user ownerships in <backupDir>
                     based on <sourceDir>
 
---pGroup        ... synchronize group ownerships on <backupDir>
+--pGroup        ... synchronize group ownerships in <backupDir>
                     based on <sourceDir>
 
---pMode         ... synchronize modes (permission bits) on <backupDir>
+--pMode         ... synchronize modes (permission bits) in <backupDir>
                     based on <sourceDir>
 
 --pRevUser      ... preserve user ownerships during REV operations
@@ -506,9 +504,14 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --noR860Hdr     ... do not write header to the restore script 860
    (Explained in the Advanced Use of Zaloha section below).
 
---noProgress    ... suppress progress messages (less screen output).
-    If both options "--noExec" and "--noProgress" are used, Zaloha does not
-    produce any output on stdout (traditional behavior of Unics tools).
+--noWarnSLinks  ... suppress warning about existence of symbolic links in
+                    <sourceDir> and the fact that they are neither followed nor
+                    synchronized to <backupDir>
+
+--noProgress    ... suppress progress messages (less screen output). If both
+                    options "--noExec" and "--noProgress" are used, Zaloha does
+                    not produce any output on stdout (traditional behavior of
+                    Unics tools).
 
 --color         ... use color highlighting (can be used on terminals which
                     support ANSI escape codes)
@@ -881,8 +884,8 @@ The modification time is more tricky:
    converting the local time.
 
  * The additional tolerable offsets of +/- 3600 seconds can be activated via the
-   "--ok3600s" option. They are assumed to exist between files on <sourceDir>
-   and files on <backupDir>, but not between files on <backupDir> and the
+   "--ok3600s" option. They are assumed to exist between files in <sourceDir>
+   and files in <backupDir>, but not between files in <backupDir> and the
    999 file in <metaDir> (from which the time of the last run of Zaloha is
    obtained). This last note is relevant especially if <metaDir> is located
    outside of <backupDir> (which is achievable via the "--metaDir" option).
@@ -899,13 +902,13 @@ solution. In the scripts for case of restore, touch commands are used
 unconditionally.
 
 Corner case REV.NEW with namespace on <sourceDir> needed for REV.MKDI or REV.NEW
-actions is occupied by object of conflicting type: The file on <backupDir>
+actions is occupied by object of conflicting type: The file in <backupDir>
 will not be reverse-copied to <sourceDir>, but removed. As this file must be
 newer than the last run of Zaloha, the action will be REMOVE.!.
 
-Corner case REV.NEW with "--findSourceOps": If the same file exists on both
-<sourceDir> and <backupDir>, and on <sourceDir> that file is masked by
-<findSourceOps> and on <backupDir> that file is newer than the last run of
+Corner case REV.NEW with "--findSourceOps": If the same file exists in both
+<sourceDir> and <backupDir>, and in <sourceDir> that file is masked by
+<findSourceOps> and in <backupDir> that file is newer than the last run of
 Zaloha, REV.NEW on that file will be prepared. This is an error which Zaloha
 is unable to detect. Hence, the shellscript for Exec3 contains a test that
 throws an error in such situation.
@@ -915,22 +918,41 @@ to determine which file is newer (decision UPDATE vs REV.UP). The implemented
 solution for that case is that for REV.UP, the <backupDir> file must be newer
 by more than 3600 seconds (plus eventual 2 secs FAT tolerance).
 
-Corner case REV.UP with hardlinked file: Reverse-updating a multiply linked
-(hardlinked) file on <sourceDir> may lead to follow-up effects.
+Corner case "--hLinks" with new link(s) to same file added or removed: The
+assignment of what link will be kept as "file" (f) and what links will be tagged
+as "hardlinks" (h) in CSV metadata after AWKHLINKS may change, leading to
+NEW and REMOVE actions.
 
-Corner case REV.UP with "--hLinks": If hardlink detection on <sourceDir> is
-active ("--hLinks" option), then Zaloha supports reverse-update of only the
-first link on <sourceDir> (the one that stays tagged as "file" (f) in
+Corner case REV.UP with "--hLinks": Zaloha supports reverse-update of only the
+first links in <sourceDir> (the ones that stay tagged as "files" (f) in
 CSV metadata after AWKHLINKS).
 
-Corner case "--hLinks" with files on <backupDir> under same paths as the
-seconds, third etc. hardlinks on <sourceDir> (the ones that will be tagged as
-"hardlinks" (h) in CSV metadata after AWKHLINKS): The files on <backupDir> will
-be removed (or kept if "--noRemove" option is given). See case 8 in AWKDIFF
-(other object on <sourceDir>, file on <backupDir>).
+Corner case UPDATE or REV.UP with hardlinked file: Updating a multiply linked
+(hardlinked) file means that the new contents will appear under all other links,
+and that may lead to follow-up effects.
 
-Corner case update of attributes with hardlinked file: Updating attributes on a
-multiply linked (hardlinked) file may lead to follow-up effects.
+Corner case update of attributes with hardlinked file: Updated attributes on a
+multiply linked (hardlinked) file will (with exceptions on some filesystem
+types) appear under all other links, and that may lead to follow-up effects.
+
+Corner case "--hLinks" with objects in <backupDir> under same paths as the
+seconds, third etc. hardlinks in <sourceDir> (the ones that will be tagged as
+"hardlinks" (h) in CSV metadata after AWKHLINKS): The objects in <backupDir>
+will be (unavoidably) removed to avoid misleading situations in that for a
+hardlinked file in <sourceDir>, <backupDir> would contain a different object
+(or eventually even a different file) under same path.
+
+Corner case objects in <backupDir> under same paths as symbolic links in
+<sourceDir>: The objects in <backupDir> will be (unavoidably) removed to avoid
+misleading situations in that for a symbolic link in <sourceDir> that points
+to an object, <backupDir> would contain a different object. The only exception
+is when the objects in <backupDir> are symbolic links as well, in which case
+they will be kept (but not changed).
+
+Corner case objects in <backupDir> under same paths as other objects (p/s/c/b/D)
+in <sourceDir>: The objects in <backupDir> will be (unavoidably) removed except
+when they are other objects (p/s/c/b/D) as well, in which case they will be kept
+(but not changed).
 
 Corner case if directory .Zaloha_metadata exists under <sourceDir> as well
 (e.g. in case of backups of backups): It will be ignored. If a backup of that
@@ -951,6 +973,17 @@ and prepares new copy commands, but they again hit the same problem. The only
 effective solution seems to be the renaming of the source files to avoid this
 type of name conflict. Last note: A similar phenomenon has been observed in the
 Cygwin environment running on Windows/ntfs too.
+
+Corner case if same directory is passed in as <sourceDir> and <backupDir>:
+Zaloha will issue a warning about identical objects. No actions will be prepared
+due to both directories being identical, except when the directory contains
+multiply-linked (hardlinked) files and the "--hLinks" option is given. In that
+case, Zaloha will prepare removals of the second, third, etc. links to same
+files. This interesting side-effect (or new use case) is explained as follows:
+Zaloha will perform hardlink detection on <sourceDir> and for the detected
+hardlinks (h) it prepares removals of the corresponding files in <backupDir>,
+which is the same directory. The hardlinks can be restored by restore script
+830_restore_hardlinks.sh.
 
 ###########################################################
 
@@ -988,20 +1021,34 @@ directories with actions to reach that target state.
 The output of AWKDIFF is then sorted by filename in reverse order (so that
 parent directories come after their children) and post-processed by AWKPOSTPROC.
 AWKPOSTPROC modifies actions on parent directories of files to REV.NEW and
-objects to KEEP only on <backupDir>.
+objects to KEEP only in <backupDir>.
 
 The remaining code uses the produced data to perform actual work, and should be
 self-explanatory.
 
 Understanding AWKDIFF is the key to understanding of whole Zaloha. An important
-hint to AWKDIFF is that it distinguishes three types of filesystem objects:
-directories, files and other objects. At any given path, each of the three types
-on <sourceDir> can meet each of the three types on <backupDir>. This gives a
-3x3 matrix. Additionally, an object can be standalone on <sourceDir>, giving
-further 3 cases, and standalone on <backupDir>, giving the last 3 cases.
-Also, mathematically, there are 3x3 + 3 + 3 = 15 cases to be handled by AWKDIFF.
+hint to AWKDIFF is that there can be five types of filesystem objects in
+<sourceDir> and four types of filesystem objects in <backupDir>. At any given
+path, each type in <sourceDir> can meet each type in <backupDir>, plus each
+type can be standalone in either <sourceDir> or <backupDir>. Mathematically,
+this results in ( 5 x 4 ) + 5 + 4 = 29 cases to be handled by AWKDIFF:
+
+                           backupDir:    d       f       l     other  (none)
+  ---------------------------------------------------------------------------
+  sourceDir:  directory          d  |    1       2       3       4      21
+              file               f  |    5       6       7       8      22
+              hardlink           h  |    9      10      11      12      23
+              symbolic link      l  |   13      14      15      16      24
+              other      p/s/c/b/D  |   17      18      19      20      25
+              (none)                |   26      27      28      29
+  ---------------------------------------------------------------------------
+
+  Note: Hardlinks (h) cannot occur in <backupDir>, because the type "h" is not
+  returned by FIND but determined by AWKHLINKS that can operate only on
+  <sourceDir>.
+
 The AWKDIFF code is commented on key places to make orientation easier.
-A good case to begin with is case 5 (file on <sourceDir>, file on <backupDir>),
+A good case to begin with is case 6 (file in <sourceDir>, file in <backupDir>),
 as this is the most important (and complex) case.
 
 If you are a database developer, you can think of the CSV metadata files as
@@ -1032,7 +1079,7 @@ column 2. In files 510 through 555, the natural primary key is again
 column 13 alone.
 
 The combined primary key in file 505 is obvious e.g. in the case of other object
-on <sourceDir> and other object on <backupDir>: File 505 then contains an
+in <sourceDir> and other object in <backupDir>: File 505 then contains an
 OK record for the former and a KEEP record for the latter, both with the same
 file's path (column 13).
 
@@ -1427,6 +1474,7 @@ noR830Hdr=0
 noR840Hdr=0
 noR850Hdr=0
 noR860Hdr=0
+noWarnSLinks=0
 noProgress=0
 color=0
 mawk=0
@@ -1476,6 +1524,7 @@ do
     --noR840Hdr)         opt_dupli_check ${noR840Hdr} "${tmpVal}";     noR840Hdr=1 ;;
     --noR850Hdr)         opt_dupli_check ${noR850Hdr} "${tmpVal}";     noR850Hdr=1 ;;
     --noR860Hdr)         opt_dupli_check ${noR860Hdr} "${tmpVal}";     noR860Hdr=1 ;;
+    --noWarnSLinks)      opt_dupli_check ${noWarnSLinks} "${tmpVal}";  noWarnSLinks=1 ;;
     --noProgress)        opt_dupli_check ${noProgress} "${tmpVal}";    noProgress=1 ;;
     --color)             opt_dupli_check ${color} "${tmpVal}";         color=1 ;;
     --mawk)              opt_dupli_check ${mawk} "${tmpVal}";          mawk=1 ;;
@@ -1779,6 +1828,7 @@ ${TRIPLET}${FSTAB}noR830Hdr${FSTAB}${noR830Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR840Hdr${FSTAB}${noR840Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR850Hdr${FSTAB}${noR850Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR860Hdr${FSTAB}${noR860Hdr}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noWarnSLinks${FSTAB}${noWarnSLinks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}mawk${FSTAB}${mawk}${FSTAB}${TRIPLET}
@@ -1975,7 +2025,7 @@ BEGIN {
   cmd = cmd " -printf '"
   cmd = cmd TRIPLET             # column  1: leading field
   cmd = cmd "\\t" sourceBackup  # column  2: S = <sourceDir>, B = <backupDir>, L = last run record
-  cmd = cmd "\\t%y"             # column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+  cmd = cmd "\\t%y"             # column  3: file's type (d = directory, f = file, [h = hardlink], l = symbolic link, p/s/c/b/D = other)
   cmd = cmd "\\t%s"             # column  4: file's size in bytes
   cmd = cmd "\\t%Ts"            # column  5: file's last modification time, seconds since 01/01/1970
   cmd = cmd "\\t%F"             # column  6: type of the filesystem the file is on
@@ -2299,7 +2349,7 @@ BEGIN {
     }
   } else {
     hcn = 1     # detected hardlink count
-    tp = $3     # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+    tp = $3     # previous record's column  3: file's type (d = directory, f = file, [h = hardlink], l = symbolic link, p/s/c/b/D = other)
     sz = $4     # previous record's column  4: file's size in bytes
     tm = $5     # previous record's column  5: file's last modification time, seconds since 01/01/1970
     dv = $7     # previous record's column  7: device number the file is on
@@ -2351,11 +2401,11 @@ BEGIN {
   FS = FSTAB
   OFS = FSTAB
   lru = 0     # time of the last run of Zaloha
-  xrn = ""    # occupied namespace for REV.NEW
-  xkp = ""    # occupied namespace for objects to KEEP only on <backupDir>
+  xkp = ""    # occupied namespace: not possible to KEEP objects only in <backupDir>
   prr = 0     # flag previous record remembered (= unprocessed)
-  idc = 0     # count of identical object(s) (inodes) on <sourceDir> and <backupDir>
-  idp = ""    # path of first identical object (inode) on <sourceDir> and <backupDir>
+  slc = 0     # count of symbolic links in <sourceDir>
+  idc = 0     # count of identical object(s) (inodes) in <sourceDir> and <backupDir>
+  idp = ""    # path of first identical object (inode) in <sourceDir> and <backupDir>
   if ( 1 == ok3600s ) {
     tof = 3600     # tolerated offset +/- 3600 seconds
   } else {
@@ -2454,30 +2504,35 @@ function attributes_or_ok() {
 }
 function process_previous_record() {
   if ( "S" == sb ) {
-    if ( "d" == tp ) {                         # directory only on <sourceDir> (case 10)
+    if ( "d" == tp ) {                         # directory only in <sourceDir> (case 21)
       print_previous( "MKDIR" )
-    } else if ( "f" == tp ) {                  # file only on <sourceDir> (case 11)
+    } else if ( "f" == tp ) {                  # file only in <sourceDir> (case 22)
       print_previous( "NEW" )
-    } else {                                   # other object only on <sourceDir> (case 12)
+    } else if ( "l" == tp ) {                  # symbolic link only in <sourceDir> (case 24)
+      print_previous( "OK" )                   #  (OK record needed for the restore scripts)
+      slc = slc + 1
+    } else {                                   # hardlink or other object only in <sourceDir> (cases 23,25)
       print_previous( "OK" )                   #  (OK record needed for the restore scripts)
     }
   } else {
-    if ( "d" == tp ) {                         # directory only on <backupDir> (case 13)
+    if ( "d" == tp ) {                         # directory only in <backupDir> (case 26)
       try_to_keep_or_remove( noRemove )
-    } else if ( "f" == tp ) {                  # file only on <backupDir> (case 14)
+    } else if ( "f" == tp ) {                  # file only in <backupDir> (case 27)
       if (( 1 == revNew ) && ( 0 != lru ) && ( lru < tm )) {
-        if ( "" == xrn ) {
+        if ( "" == xkp ) {
           print_previous( "REV.NEW" )
-        } else if ( 1 == index( pt, xrn )) {
-          try_to_keep_or_remove( noRemove )
+        } else if ( 1 == index( pt, xkp )) {
+          remove( "u" )                        #  (unavoidable removal)
         } else {
           print_previous( "REV.NEW" )
-          xrn = ""
+          xkp = ""
         }
       } else {
         try_to_keep_or_remove( noRemove )
       }
-    } else {                                   # other object only on <backupDir> (case 15)
+    } else if ( "l" == tp ) {                  # symbolic link only in <backupDir> (case 28)
+      try_to_keep_or_remove( noRemove )
+    } else {                                   # other object only in <backupDir> (case 29)
       try_to_keep_or_remove( 1 )
     }
   }
@@ -2505,20 +2560,19 @@ function process_previous_record() {
            }
            idc = idc + 1
         }
-        if ( "d" == $3 ) {                     ## directory on <sourceDir>
-          if ( "d" == tp ) {                   # directory on <sourceDir>, directory on <backupDir> (case 1)
+        if ( "d" == $3 ) {                     ## directory in <sourceDir>
+          if ( "d" == tp ) {                   # directory in <sourceDir>, directory in <backupDir> (case 1)
             attributes_or_ok()
-          } else {                             # directory on <sourceDir>, file or other object on <backupDir> (cases 2,3)
+          } else {                             # directory in <sourceDir>, file, symbolic link or other object in <backupDir> (cases 2,3,4)
             remove( "u" )                      #  (unavoidable removal)
             print_current( "MKDIR" )
           }
-        } else if ( "f" == $3 ) {              ## file on <sourceDir>
-          if ( "d" == tp ) {                   # file on <sourceDir>, directory on <backupDir> (case 4)
-            xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
-            xkp = pt                           #  (KEEP impossible down from here due to occupied namespace)
+        } else if ( "f" == $3 ) {              ## file in <sourceDir>
+          if ( "d" == tp ) {                   # file in <sourceDir>, directory in <backupDir> (case 5)
+            xkp = pt                           #  (not possible to KEEP objects only in <backupDir> down from here due to occupied namespace)
             remove( "u" )                      #  (unavoidable removal)
             print_current( "NEW" )
-          } else if ( "f" == tp ) {            # file on <sourceDir>, file on <backupDir> (case 5)
+          } else if ( "f" == tp ) {            # file in <sourceDir>, file in <backupDir> (case 6)
             oka = 0
             if ( "M" $4 == "M" sz ) {
               if ( "M" $5 == "M" tm ) {
@@ -2556,20 +2610,31 @@ function process_previous_record() {
                 update_file()
               }
             }
-          } else {                             # file on <sourceDir>, other object on <backupDir> (case 6)
+          } else {                             # file in <sourceDir>, symbolic link or other object in <backupDir> (cases 7,8)
             remove( "u" )                      #  (unavoidable removal)
             print_current( "NEW" )
           }
-        } else {                               ## other object on <sourceDir>
-          if ( "d" == tp ) {                   # other object on <sourceDir>, directory on <backupDir> (case 7)
-            xrn = pt                           #  (REV.NEW impossible down from here due to occupied namespace)
-            keep_or_remove( noRemove )
-          } else if ( "f" == tp ) {            # other object on <sourceDir>, file on <backupDir> (case 8)
-            keep_or_remove( noRemove )
-          } else {                             # other object on <sourceDir>, other object on <backupDir> (case 9)
-            print_previous( "KEEP" )
+        } else if ( "h" == $3 ) {              ## hardlink in <sourceDir> (cases 9,10,11,12)
+          xkp = pt                             #  (not possible to KEEP objects only in <backupDir> down from here due to occupied namespace)
+          remove( "u" )                        #  (unavoidable removal, see Corner Cases section)
+          print_current( "OK" )                #  (OK record needed for the restore scripts)
+        } else if ( "l" == $3 ) {              ## symbolic link in <sourceDir>
+          if ( "l" == tp ) {                   # symbolic link in <sourceDir>, symbolic link in <backupDir> (case 15)
+            print_previous( "KEEP" )           #  ( keep the symbolic link in <backupDir>, but do not change it)
+          } else {                             # symbolic link in <sourceDir>, directory, file or other object in <backupDir> (cases 13,14,16)
+            xkp = pt                           #  (not possible to KEEP objects only in <backupDir> down from here due to occupied namespace)
+            remove( "u" )                      #  (unavoidable removal, see Corner Cases section)
           }
           print_current( "OK" )                #  (OK record needed for the restore scripts)
+          slc = slc + 1
+        } else {                               ## other object in <sourceDir>
+          if ( tp ~ /[dfl]/ ) {                # other object in <sourceDir>, directory, file or symbolic link in <backupDir> (cases 17,18,19)
+            xkp = pt                           #  (not possible to KEEP objects only in <backupDir> down from here due to occupied namespace)
+            remove( "u" )                      #  (unavoidable removal, see Corner Cases section)
+          } else {                             # other object in <sourceDir>, other object in <backupDir> (case 20)
+            print_previous( "KEEP" )           #  ( keep the other object in <backupDir>, but do not change it)
+          }
+          print_current( "OK" )                #  (OK record for keeping in metadata)
         }
         prr = 0
       } else {                                 ### different name on <sourceDir> and <backupDir>
@@ -2581,7 +2646,7 @@ function process_previous_record() {
     }
   }
   sb = $2     # previous record's column  2: S = <sourceDir>, B = <backupDir>, L = last run record
-  tp = $3     # previous record's column  3: file's type (d = directory, f = file, l = symbolic link, [h = hardlink], p/s/c/b/D = other)
+  tp = $3     # previous record's column  3: file's type (d = directory, f = file, [h = hardlink], l = symbolic link, p/s/c/b/D = other)
   sz = $4     # previous record's column  4: file's size in bytes
   tm = $5     # previous record's column  5: file's last modification time, seconds since 01/01/1970
   ft = $6     # previous record's column  6: type of the filesystem the file is on
@@ -2598,13 +2663,16 @@ END {
   if ( 1 == prr ) {
     process_previous_record()
   }
+  if (( 0 == noWarnSLinks ) && ( 0 != slc )) {
+    warning( slc " symbolic links in <sourceDir>: they are neither followed nor synchronized to <backupDir>" )
+  }
   if ( 0 != idc ) {
     if ( "" == idp ) {
-      warning( idc " identical object(s) (inodes) on <sourceDir> and <backupDir>, first are <sourceDir> and <backupDir> themselves" )
+      warning( idc " identical object(s) (inodes) in <sourceDir> and <backupDir>, first are <sourceDir> and <backupDir> themselves" )
     } else {
       gsub( TRIPLETSREGEX, SLASH, idp )
       idp = substr( idp, 1, length( idp ) - 1 )
-      warning( idc " identical object(s) (inodes) on <sourceDir> and <backupDir>, path of first case: " idp )
+      warning( idc " identical object(s) (inodes) in <sourceDir> and <backupDir>, path of first case: " idp )
     }
   }
   if (( 0 == noLastRun ) && ( 0 == lru )) {
@@ -2637,7 +2705,8 @@ ${awk} -f "${f170}"                     \
        -v pMode=${pMode}                \
        -v noLastRun=${noLastRun}        \
        -v noIdentCheck=${noIdentCheck}  \
-       "${fLastRun}" "${f370}"    > "${f380}"
+       -v noWarnSLinks=${noWarnSLinks}  \
+       "${fLastRun}" "${f370}"          > "${f380}"
 
 optim_csv_after_use "${f370}"
 
@@ -2655,7 +2724,7 @@ BEGIN {
     printf "" > f540
   }
   lrn = ""    # path of last file to REV.NEW
-  lkp = ""    # path of last object to KEEP only on <backupDir>
+  lkp = ""    # path of last object to KEEP only in <backupDir>
 }
 {
   if ( $2 ~ /^REV\.NEW/ ) {
@@ -2664,13 +2733,13 @@ BEGIN {
     if (( "d" == $3 ) && ( 1 == index( lrn, $13 ))) {
       $2 = "REV.MKDI"     # convert KEEP to REV.MKDI on parent directory of a file to REV.NEW
     } else {
-      lkp = $13           # remember path of last object to KEEP only on <backupDir>
+      lkp = $13           # remember path of last object to KEEP only in <backupDir>
     }
   } else if ( $2 ~ /^RMDIR/ ) {
     if ( 1 == index( lrn, $13 )) {
       $2 = "REV.MKDI"     # convert RMDIR to REV.MKDI on parent directory of a file to REV.NEW
     } else if ( 1 == index( lkp, $13 )) {
-      $2 = "KEEP"         # convert RMDIR to KEEP on parent directory of an object to KEEP only on <backupDir>
+      $2 = "KEEP"         # convert RMDIR to KEEP on parent directory of an object to KEEP only in <backupDir>
     }
   }
   # modifications done, split off 510 and 540 data, output remaining data
@@ -3057,7 +3126,7 @@ BEGIN {
     print "backupDir='" backupDir "'"
     print "function rev_exists_err {"
     XTRACE_OFF
-    print "  echo \"Zaloha: Object exists on <sourceDir> (masked by <findSourceOps> ?): ${1}\" >&2"
+    print "  echo \"Zaloha: Object exists in <sourceDir> (masked by <findSourceOps> ?): ${1}\" >&2"
     if ( 0 == noExec ) {
       print "  exit 1"
     }

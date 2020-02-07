@@ -70,37 +70,36 @@ Exec1:  unavoidable removals from &lt;backupDir&gt; (objects of conflicting type
 <b>REMOVE</b>    regular remove file from &lt;backupDir&gt;
 <b>REMOVE.!</b>  remove file from &lt;backupDir&gt; which is newer than the
           last run of Zaloha
-<b>REMOVE.x</b>  remove other object on &lt;backupDir&gt; that occupies needed namespace,
-          x = object type (l/p/s/c/b/D)
+<b>REMOVE.x</b>  remove other object in &lt;backupDir&gt;, x = object type (l/p/s/c/b/D)
 
-Exec2:  copy files/directories to &lt;backupDir&gt; which exist only on &lt;sourceDir&gt;,
-        or files which are newer on &lt;sourceDir&gt;
+Exec2:  copy files/directories to &lt;backupDir&gt; which exist only in &lt;sourceDir&gt;,
+        or files which are newer in &lt;sourceDir&gt;
 -----------------------------------
-<b>MKDIR</b>     regular create new directory on &lt;backupDir&gt;
-<b>NEW</b>       regular create new file on &lt;backupDir&gt;
-<b>UPDATE</b>    regular update file on &lt;backupDir&gt;
-<b>UPDATE.!</b>  update file on &lt;backupDir&gt; which is newer than the last run of Zaloha
-<b>UPDATE.?</b>  update file on &lt;backupDir&gt; by a file on &lt;sourceDir&gt; which is not newer
+<b>MKDIR</b>     regular create new directory in &lt;backupDir&gt;
+<b>NEW</b>       regular create new file in &lt;backupDir&gt;
+<b>UPDATE</b>    regular update file in &lt;backupDir&gt;
+<b>UPDATE.!</b>  update file in &lt;backupDir&gt; which is newer than the last run of Zaloha
+<b>UPDATE.?</b>  update file in &lt;backupDir&gt; by a file in &lt;sourceDir&gt; which is not newer
           (or not newer by 3600 secs if option <b>--ok3600s</b> is given plus
            eventual 2 secs FAT tolerance)
-<b>unl.UP</b>    unlink file on &lt;backupDir&gt; + <b>UPDATE</b> (can be switched off via the
+<b>unl.UP</b>    unlink file in &lt;backupDir&gt; + <b>UPDATE</b> (can be switched off via the
           <b>--noUnlink</b> option, see below)
-<b>unl.UP.!</b>  unlink file on &lt;backupDir&gt; + <b>UPDATE.!</b> (can be switched off via the
+<b>unl.UP.!</b>  unlink file in &lt;backupDir&gt; + <b>UPDATE.!</b> (can be switched off via the
           <b>--noUnlink</b> option, see below)
-<b>unl.UP.?</b>  unlink file on &lt;backupDir&gt; + <b>UPDATE.?</b> (can be switched off via the
+<b>unl.UP.?</b>  unlink file in &lt;backupDir&gt; + <b>UPDATE.?</b> (can be switched off via the
           <b>--noUnlink</b> option, see below)
-<b>ATTR:ugm</b>  update only attributes on &lt;backupDir&gt; (u=user ownership,
+<b>ATTR:ugm</b>  update only attributes in &lt;backupDir&gt; (u=user ownership,
           g=group ownership, m=mode) (optional feature, see below)
 
 Exec3:  reverse-synchronization from &lt;backupDir&gt; to &lt;sourceDir&gt; (optional
         feature, can be activated via the <b>--revNew</b> and <b>--revUp</b> options)
 -----------------------------------
-<b>REV.MKDI</b>  reverse-create parent directory on &lt;sourceDir&gt; due to <b>REV.NEW</b>
-<b>REV.NEW</b>   reverse-create file on &lt;sourceDir&gt; (if a standalone file on
+<b>REV.MKDI</b>  reverse-create parent directory in &lt;sourceDir&gt; due to <b>REV.NEW</b>
+<b>REV.NEW</b>   reverse-create file in &lt;sourceDir&gt; (if a standalone file in
           &lt;backupDir&gt; is newer than the last run of Zaloha)
-<b>REV.UP</b>    reverse-update file on &lt;sourceDir&gt; (if the file on &lt;backupDir&gt;
-          is newer than the file on &lt;sourceDir&gt;)
-<b>REV.UP.!</b>  reverse-update file on &lt;sourceDir&gt; which is newer
+<b>REV.UP</b>    reverse-update file in &lt;sourceDir&gt; (if the file in &lt;backupDir&gt;
+          is newer than the file in &lt;sourceDir&gt;)
+<b>REV.UP.!</b>  reverse-update file in &lt;sourceDir&gt; which is newer
           than the last run of Zaloha (or newer than the last run of Zaloha
           minus 3600 secs if option <b>--ok3600s</b> is given)
 
@@ -111,24 +110,23 @@ Exec4:  remaining removals of obsolete files/directories from &lt;backupDir&gt;
 <b>REMOVE</b>    regular remove file from &lt;backupDir&gt;
 <b>REMOVE.!</b>  remove file from &lt;backupDir&gt; which is newer than the
           last run of Zaloha
-<b>REMOVE.x</b>  remove other object on &lt;backupDir&gt; that occupies needed namespace,
-          x = object type (l/p/s/c/b/D)
+<b>REMOVE.x</b>  remove other object in &lt;backupDir&gt;, x = object type (l/p/s/c/b/D)
 
 Exec5:  updates resulting from optional "byte by byte" comparing of files
         (optional feature, can be activated via the <b>--byteByByte</b> option)
 -----------------------------------
-<b>UPDATE.b</b>  update file on &lt;backupDir&gt; because it is not identical byte by byte
-<b>unl.UP.b</b>  unlink file on &lt;backupDir&gt; + <b>UPDATE.b</b> (can be switched off via the
+<b>UPDATE.b</b>  update file in &lt;backupDir&gt; because it is not identical byte by byte
+<b>unl.UP.b</b>  unlink file in &lt;backupDir&gt; + <b>UPDATE.b</b> (can be switched off via the
           <b>--noUnlink</b> option, see below)
 
 (internal use, for completion only)
 -----------------------------------
-<b>OK</b>        object without needed action on &lt;sourceDir&gt; (either files or
+<b>OK</b>        object without needed action in &lt;sourceDir&gt; (either files or
           directories already synchronized with &lt;backupDir&gt;, or other objects
           not to be synchronized to &lt;backupDir&gt;). These records are necessary
           for preparation of shellscripts for the case of restore.
 <b>OK.b</b>      file proven identical byte by byte (in CSV metadata file 555)
-<b>KEEP</b>      object to be kept only on &lt;backupDir&gt;
+<b>KEEP</b>      object to be kept only in &lt;backupDir&gt;
 <b>uRMDIR</b>    unavoidable <b>RMDIR</b> which goes into Exec1 (in CSV files 380 and 390)
 <b>uREMOVE</b>   unavoidable <b>REMOVE</b> which goes into Exec1 (in CSV files 380 and 390)
 </pre>
@@ -141,19 +139,19 @@ Exec1:
 ------
 Unavoidable removals from &lt;backupDir&gt; (objects of conflicting types which occupy
 needed namespace). This must be the first step, because objects of conflicting
-types on &lt;backupDir&gt; would prevent synchronization (e.g. a file cannot overwrite
+types in &lt;backupDir&gt; would prevent synchronization (e.g. a file cannot overwrite
 a directory).
 
 Unavoidable removals are prepared regardless of the <b>--noRemove</b> option.
 
 Exec2:
 ------
-Files and directories which exist only on &lt;sourceDir&gt; are copied to &lt;backupDir&gt;
+Files and directories which exist only in &lt;sourceDir&gt; are copied to &lt;backupDir&gt;
 (action codes <b>NEW</b> and <b>MKDIR</b>).
 
-Zaloha "updates" the file on &lt;backupDir&gt; (action code <b>UPDATE</b>) if the same file
-exists on both &lt;sourceDir&gt; and &lt;backupDir&gt; and the comparisons of file size and
-modification time indicate the necessity of this "update". If the file on
+Zaloha "updates" the file in &lt;backupDir&gt; (action code <b>UPDATE</b>) if the same file
+exists in both &lt;sourceDir&gt; and &lt;backupDir&gt; and the comparisons of file size and
+modification time indicate the necessity of this "update". If the file in
 &lt;backupDir&gt; is multiply linked (hardlinked), Zaloha removes (unlinks) it first,
 to prevent "updating" a multiply linked file, which could lead to follow-up
 effects (action code <b>unl.UP</b>). This unlinking can be switched off via the
@@ -164,7 +162,7 @@ m=mode), and attribute synchronization is switched on via the <b>--pUser,</b>
 <b>--pGroup</b> and <b>--pMode</b> options, then only these attributes will be
 synchronized (action code <b>ATTR</b>). However, this is an optional feature, because:
 (1) the filesystem of &lt;backupDir&gt; might not be capable of storing these
-attributes, or (2) it may be wanted that all files and directories on
+attributes, or (2) it may be wanted that all files and directories in
 &lt;backupDir&gt; are owned by the user who runs Zaloha.
 
 Regardless of whether these attributes are synchronized or not, an eventual
@@ -172,11 +170,8 @@ restore of &lt;sourceDir&gt; from &lt;backupDir&gt; including these attributes i
 thanks to the restore scripts which Zaloha prepares in its metadata directory
 (see below).
 
-Symbolic links on &lt;sourceDir&gt; are neither followed nor synchronized to
-&lt;backupDir&gt;, but Zaloha prepares a restore script in its metadata directory.
-
 Zaloha contains an optional feature to detect multiply linked (hardlinked) files
-on &lt;sourceDir&gt;. If this feature is switched on (via the <b>--hLinks</b> option),
+in &lt;sourceDir&gt;. If this feature is switched on (via the <b>--hLinks</b> option),
 Zaloha internally flags the second, third, etc. links to same file as
 "hardlinks", and synchronizes to &lt;backupDir&gt; only the first link (the "file").
 The "hardlinks" are not synchronized to &lt;backupDir&gt;, but Zaloha prepares a
@@ -193,7 +188,10 @@ hardlinks (see code of AWKHLINKS). Generally, use this feature only after proper
 testing on your filesystems. Be cautious as inode-related issues exist on some
 filesystems and network-mounted filesystems.
 
-Zaloha does not synchronize other types of objects on &lt;sourceDir&gt; (named pipes,
+Symbolic links in &lt;sourceDir&gt; are neither followed nor synchronized to
+&lt;backupDir&gt;, but Zaloha prepares a restore script in its metadata directory.
+
+Zaloha does not synchronize other types of objects in &lt;sourceDir&gt; (named pipes,
 sockets, special devices, etc). These objects are considered to be part of the
 operating system or parts of applications, and dedicated scripts for their
 (re-)creation should exist.
@@ -215,21 +213,21 @@ That work should be "reverse-synchronized" from the Linux server (&lt;backupDir&
 back to the Windows notebook (&lt;sourceDir&gt;) (of course, assumed that there is no
 conflict between the work on the notebook and the work on the server).
 
-<b>REV.NEW:</b> If a standalone file on &lt;backupDir&gt; is newer than the last run of
+<b>REV.NEW:</b> If a standalone file in &lt;backupDir&gt; is newer than the last run of
 Zaloha, and the <b>--revNew</b> option is given, then Zaloha reverse-copies that file
 to &lt;sourceDir&gt; (<b>REV.NEW</b>) including all necessary parent directories (<b>REV.MKDI</b>).
 
-<b>REV.UP:</b> If the same file exists on both &lt;sourceDir&gt; and &lt;backupDir&gt;, and the
-file on &lt;backupDir&gt; is newer, and the <b>--revUp</b> option is given, then Zaloha
-uses that file to reverse-update the older file on &lt;sourceDir&gt; (<b>REV.UP</b>).
+<b>REV.UP:</b> If the same file exists in both &lt;sourceDir&gt; and &lt;backupDir&gt;, and the
+file in &lt;backupDir&gt; is newer, and the <b>--revUp</b> option is given, then Zaloha
+uses that file to reverse-update the older file in &lt;sourceDir&gt; (<b>REV.UP</b>).
 
 Optionally, to preserve attributes during the <b>REV.MKDI,</b> <b>REV.NEW</b> and <b>REV.UP</b>
 operations: use options <b>--pRevUser,</b> <b>--pRevGroup</b> and <b>--pRevMode.</b>
 
 If reverse-synchronization is not active: If no <b>--revNew</b> option is given,
-then each standalone file on &lt;backupDir&gt; is considered obsolete (and removed,
+then each standalone file in &lt;backupDir&gt; is considered obsolete (and removed,
 unless the <b>--noRemove</b> option is given). If no <b>--revUp</b> option is given, then
-files on &lt;sourceDir&gt; always update files on &lt;backupDir&gt; if they differ.
+files in &lt;sourceDir&gt; always update files in &lt;backupDir&gt; if they differ.
 
 Reverse-synchronization to &lt;sourceDir&gt; increases the overall complexity of the
 solution. Use it only in the interactive regime of Zaloha, where human oversight
@@ -244,7 +242,7 @@ This function can be switched off via the <b>--noRemove</b> option.
 Why are removals from &lt;backupDir&gt; split into two steps (Exec1 and Exec4)?
 The unavoidable removals must unconditionally occur first, also in Exec1 step.
 But what about the remaining (avoidable) removals: Imagine a scenario when a
-directory is renamed on &lt;sourceDir&gt;: If all removals were executed in Exec1,
+directory is renamed in &lt;sourceDir&gt;: If all removals were executed in Exec1,
 then &lt;backupDir&gt; would transition through a state (namely between Exec1 and
 Exec2) when the backup copy of the directory is already removed (under the old
 name), but not yet created (under the new name). To minimize the chance for such
@@ -258,7 +256,7 @@ massive copying followed by massive removing.
 
 Exec5:
 ------
-Zaloha updates files on &lt;backupDir&gt; for which the optional "byte by byte"
+Zaloha updates files in &lt;backupDir&gt; for which the optional "byte by byte"
 comparing revealed that they are in fact not identical (despite appearing
 identical by looking at their file sizes and modification times).
 
@@ -353,24 +351,24 @@ key variables for whole script are defined (and can be adjusted as needed).
     different from the interactive regime, where scripts are traced and halt
     on the first error.
 
-<b>--noRemove</b>      ... do not remove files and directories which exist only
-    on &lt;backupDir&gt;. This option is useful in situations like that &lt;sourceDir&gt;
-    holds only "current" files but &lt;backupDir&gt; holds "current" plus
-    "historical" files.
+<b>--noRemove</b>      ... do not remove files, directories and symbolic links that
+    are standalone in &lt;backupDir&gt;. This option is useful when &lt;backupDir&gt; should
+    hold "current" plus "historical" data whereas &lt;sourceDir&gt; holds only
+    "current" data.
 
-    Please keep in mind that if objects of conflicting types on &lt;backupDir&gt;
+    Please keep in mind that if objects of conflicting types in &lt;backupDir&gt;
     prevent synchronization (e.g. a file cannot overwrite a directory),
     removals are unavoidable and will be prepared regardless of this option.
     In such case Zaloha displays a warning message in the interactive regime.
     In automatic operations, the calling process should query the CSV metadata
     file 510 to detect this case.
 
-<b>--revNew</b>        ... enable <b>REV.NEW</b> (= if standalone file on &lt;backupDir&gt; is
+<b>--revNew</b>        ... enable <b>REV.NEW</b> (= if standalone file in &lt;backupDir&gt; is
                     newer than the last run of Zaloha, reverse-copy it
                     to &lt;sourceDir&gt;)
 
-<b>--revUp</b>         ... enable <b>REV.UP</b> (= if file on &lt;backupDir&gt; is newer than
-                    file on &lt;sourceDir&gt;, reverse-update the file on &lt;sourceDir&gt;)
+<b>--revUp</b>         ... enable <b>REV.UP</b> (= if file in &lt;backupDir&gt; is newer than
+                    file in &lt;sourceDir&gt;, reverse-update the file in &lt;sourceDir&gt;)
 
 <b>--hLinks</b>        ... perform hardlink detection (inode-deduplication)
                     on &lt;sourceDir&gt;
@@ -393,19 +391,19 @@ key variables for whole script are defined (and can be adjusted as needed).
                     If additional updates of files result from this comparison,
                     they will be executed in step Exec5.
 
-<b>--noUnlink</b>      ... never unlink multiply linked files on &lt;backupDir&gt; before
+<b>--noUnlink</b>      ... never unlink multiply linked files in &lt;backupDir&gt; before
                     writing to them
 
 <b>--touch</b>         ... use cp + touch instead of cp --preserve=timestamps
                     (explained in Special Cases section below)
 
-<b>--pUser</b>         ... synchronize user ownerships on &lt;backupDir&gt;
+<b>--pUser</b>         ... synchronize user ownerships in &lt;backupDir&gt;
                     based on &lt;sourceDir&gt;
 
-<b>--pGroup</b>        ... synchronize group ownerships on &lt;backupDir&gt;
+<b>--pGroup</b>        ... synchronize group ownerships in &lt;backupDir&gt;
                     based on &lt;sourceDir&gt;
 
-<b>--pMode</b>         ... synchronize modes (permission bits) on &lt;backupDir&gt;
+<b>--pMode</b>         ... synchronize modes (permission bits) in &lt;backupDir&gt;
                     based on &lt;sourceDir&gt;
 
 <b>--pRevUser</b>      ... preserve user ownerships during REV operations
@@ -481,9 +479,14 @@ key variables for whole script are defined (and can be adjusted as needed).
 <b>--noR860Hdr</b>     ... do not write header to the restore script 860
    (Explained in the Advanced Use of Zaloha section below).
 
-<b>--noProgress</b>    ... suppress progress messages (less screen output).
-    If both options <b>--noExec</b> and <b>--noProgress</b> are used, Zaloha does not
-    produce any output on stdout (traditional behavior of Unics tools).
+<b>--noWarnSLinks</b>  ... suppress warning about existence of symbolic links in
+                    &lt;sourceDir&gt; and the fact that they are neither followed nor
+                    synchronized to &lt;backupDir&gt;
+
+<b>--noProgress</b>    ... suppress progress messages (less screen output). If both
+                    options <b>--noExec</b> and <b>--noProgress</b> are used, Zaloha does
+                    not produce any output on stdout (traditional behavior of
+                    Unics tools).
 
 <b>--color</b>         ... use color highlighting (can be used on terminals which
                     support ANSI escape codes)
@@ -859,8 +862,8 @@ The modification time is more tricky:
    converting the local time.
 
  * The additional tolerable offsets of +/- 3600 seconds can be activated via the
-   <b>--ok3600s</b> option. They are assumed to exist between files on &lt;sourceDir&gt;
-   and files on &lt;backupDir&gt;, but not between files on &lt;backupDir&gt; and the
+   <b>--ok3600s</b> option. They are assumed to exist between files in &lt;sourceDir&gt;
+   and files in &lt;backupDir&gt;, but not between files in &lt;backupDir&gt; and the
    999 file in &lt;metaDir&gt; (from which the time of the last run of Zaloha is
    obtained). This last note is relevant especially if &lt;metaDir&gt; is located
    outside of &lt;backupDir&gt; (which is achievable via the <b>--metaDir</b> option).
@@ -877,13 +880,13 @@ solution. In the scripts for case of restore, touch commands are used
 unconditionally.
 
 Corner case <b>REV.NEW</b> with namespace on &lt;sourceDir&gt; needed for <b>REV.MKDI</b> or <b>REV.NEW</b>
-actions is occupied by object of conflicting type: The file on &lt;backupDir&gt;
+actions is occupied by object of conflicting type: The file in &lt;backupDir&gt;
 will not be reverse-copied to &lt;sourceDir&gt;, but removed. As this file must be
 newer than the last run of Zaloha, the action will be <b>REMOVE.!.</b>
 
-Corner case <b>REV.NEW</b> with <b>--findSourceOps:</b> If the same file exists on both
-&lt;sourceDir&gt; and &lt;backupDir&gt;, and on &lt;sourceDir&gt; that file is masked by
-&lt;findSourceOps&gt; and on &lt;backupDir&gt; that file is newer than the last run of
+Corner case <b>REV.NEW</b> with <b>--findSourceOps:</b> If the same file exists in both
+&lt;sourceDir&gt; and &lt;backupDir&gt;, and in &lt;sourceDir&gt; that file is masked by
+&lt;findSourceOps&gt; and in &lt;backupDir&gt; that file is newer than the last run of
 Zaloha, <b>REV.NEW</b> on that file will be prepared. This is an error which Zaloha
 is unable to detect. Hence, the shellscript for Exec3 contains a test that
 throws an error in such situation.
@@ -893,22 +896,41 @@ to determine which file is newer (decision <b>UPDATE</b> vs <b>REV.UP</b>). The 
 solution for that case is that for <b>REV.UP,</b> the &lt;backupDir&gt; file must be newer
 by more than 3600 seconds (plus eventual 2 secs FAT tolerance).
 
-Corner case <b>REV.UP</b> with hardlinked file: Reverse-updating a multiply linked
-(hardlinked) file on &lt;sourceDir&gt; may lead to follow-up effects.
+Corner case <b>--hLinks</b> with new link(s) to same file added or removed: The
+assignment of what link will be kept as "file" (f) and what links will be tagged
+as "hardlinks" (h) in CSV metadata after AWKHLINKS may change, leading to
+<b>NEW</b> and <b>REMOVE</b> actions.
 
-Corner case <b>REV.UP</b> with <b>--hLinks:</b> If hardlink detection on &lt;sourceDir&gt; is
-active (<b>--hLinks</b> option), then Zaloha supports reverse-update of only the
-first link on &lt;sourceDir&gt; (the one that stays tagged as "file" (f) in
+Corner case <b>REV.UP</b> with <b>--hLinks:</b> Zaloha supports reverse-update of only the
+first links in &lt;sourceDir&gt; (the ones that stay tagged as "files" (f) in
 CSV metadata after AWKHLINKS).
 
-Corner case <b>--hLinks</b> with files on &lt;backupDir&gt; under same paths as the
-seconds, third etc. hardlinks on &lt;sourceDir&gt; (the ones that will be tagged as
-"hardlinks" (h) in CSV metadata after AWKHLINKS): The files on &lt;backupDir&gt; will
-be removed (or kept if <b>--noRemove</b> option is given). See case 8 in AWKDIFF
-(other object on &lt;sourceDir&gt;, file on &lt;backupDir&gt;).
+Corner case <b>UPDATE</b> or <b>REV.UP</b> with hardlinked file: Updating a multiply linked
+(hardlinked) file means that the new contents will appear under all other links,
+and that may lead to follow-up effects.
 
-Corner case update of attributes with hardlinked file: Updating attributes on a
-multiply linked (hardlinked) file may lead to follow-up effects.
+Corner case update of attributes with hardlinked file: Updated attributes on a
+multiply linked (hardlinked) file will (with exceptions on some filesystem
+types) appear under all other links, and that may lead to follow-up effects.
+
+Corner case <b>--hLinks</b> with objects in &lt;backupDir&gt; under same paths as the
+seconds, third etc. hardlinks in &lt;sourceDir&gt; (the ones that will be tagged as
+"hardlinks" (h) in CSV metadata after AWKHLINKS): The objects in &lt;backupDir&gt;
+will be (unavoidably) removed to avoid misleading situations in that for a
+hardlinked file in &lt;sourceDir&gt;, &lt;backupDir&gt; would contain a different object
+(or eventually even a different file) under same path.
+
+Corner case objects in &lt;backupDir&gt; under same paths as symbolic links in
+&lt;sourceDir&gt;: The objects in &lt;backupDir&gt; will be (unavoidably) removed to avoid
+misleading situations in that for a symbolic link in &lt;sourceDir&gt; that points
+to an object, &lt;backupDir&gt; would contain a different object. The only exception
+is when the objects in &lt;backupDir&gt; are symbolic links as well, in which case
+they will be kept (but not changed).
+
+Corner case objects in &lt;backupDir&gt; under same paths as other objects (p/s/c/b/D)
+in &lt;sourceDir&gt;: The objects in &lt;backupDir&gt; will be (unavoidably) removed except
+when they are other objects (p/s/c/b/D) as well, in which case they will be kept
+(but not changed).
 
 Corner case if directory .Zaloha_metadata exists under &lt;sourceDir&gt; as well
 (e.g. in case of backups of backups): It will be ignored. If a backup of that
@@ -929,6 +951,17 @@ and prepares new copy commands, but they again hit the same problem. The only
 effective solution seems to be the renaming of the source files to avoid this
 type of name conflict. Last note: A similar phenomenon has been observed in the
 Cygwin environment running on Windows/ntfs too.
+
+Corner case if same directory is passed in as &lt;sourceDir&gt; and &lt;backupDir&gt;:
+Zaloha will issue a warning about identical objects. No actions will be prepared
+due to both directories being identical, except when the directory contains
+multiply-linked (hardlinked) files and the <b>--hLinks</b> option is given. In that
+case, Zaloha will prepare removals of the second, third, etc. links to same
+files. This interesting side-effect (or new use case) is explained as follows:
+Zaloha will perform hardlink detection on &lt;sourceDir&gt; and for the detected
+hardlinks (h) it prepares removals of the corresponding files in &lt;backupDir&gt;,
+which is the same directory. The hardlinks can be restored by restore script
+830_restore_hardlinks.sh.
 </pre>
 
 
@@ -967,20 +1000,34 @@ directories with actions to reach that target state.
 The output of AWKDIFF is then sorted by filename in reverse order (so that
 parent directories come after their children) and post-processed by AWKPOSTPROC.
 AWKPOSTPROC modifies actions on parent directories of files to <b>REV.NEW</b> and
-objects to <b>KEEP</b> only on &lt;backupDir&gt;.
+objects to <b>KEEP</b> only in &lt;backupDir&gt;.
 
 The remaining code uses the produced data to perform actual work, and should be
 self-explanatory.
 
 Understanding AWKDIFF is the key to understanding of whole Zaloha. An important
-hint to AWKDIFF is that it distinguishes three types of filesystem objects:
-directories, files and other objects. At any given path, each of the three types
-on &lt;sourceDir&gt; can meet each of the three types on &lt;backupDir&gt;. This gives a
-3x3 matrix. Additionally, an object can be standalone on &lt;sourceDir&gt;, giving
-further 3 cases, and standalone on &lt;backupDir&gt;, giving the last 3 cases.
-Also, mathematically, there are 3x3 + 3 + 3 = 15 cases to be handled by AWKDIFF.
+hint to AWKDIFF is that there can be five types of filesystem objects in
+&lt;sourceDir&gt; and four types of filesystem objects in &lt;backupDir&gt;. At any given
+path, each type in &lt;sourceDir&gt; can meet each type in &lt;backupDir&gt;, plus each
+type can be standalone in either &lt;sourceDir&gt; or &lt;backupDir&gt;. Mathematically,
+this results in ( 5 x 4 ) + 5 + 4 = 29 cases to be handled by AWKDIFF:
+
+                           backupDir:    d       f       l     other  (none)
+  ---------------------------------------------------------------------------
+  sourceDir:  directory          d  |    1       2       3       4      21
+              file               f  |    5       6       7       8      22
+              hardlink           h  |    9      10      11      12      23
+              symbolic link      l  |   13      14      15      16      24
+              other      p/s/c/b/D  |   17      18      19      20      25
+              (none)                |   26      27      28      29
+  ---------------------------------------------------------------------------
+
+  Note: Hardlinks (h) cannot occur in &lt;backupDir&gt;, because the type "h" is not
+  returned by FIND but determined by AWKHLINKS that can operate only on
+  &lt;sourceDir&gt;.
+
 The AWKDIFF code is commented on key places to make orientation easier.
-A good case to begin with is case 5 (file on &lt;sourceDir&gt;, file on &lt;backupDir&gt;),
+A good case to begin with is case 6 (file in &lt;sourceDir&gt;, file in &lt;backupDir&gt;),
 as this is the most important (and complex) case.
 
 If you are a database developer, you can think of the CSV metadata files as
@@ -1011,7 +1058,7 @@ column 2. In files 510 through 555, the natural primary key is again
 column 13 alone.
 
 The combined primary key in file 505 is obvious e.g. in the case of other object
-on &lt;sourceDir&gt; and other object on &lt;backupDir&gt;: File 505 then contains an
+in &lt;sourceDir&gt; and other object in &lt;backupDir&gt;: File 505 then contains an
 <b>OK</b> record for the former and a <b>KEEP</b> record for the latter, both with the same
 file's path (column 13).
 </pre>
