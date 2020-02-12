@@ -188,8 +188,12 @@ hardlinks (see code of AWKHLINKS). Generally, use this feature only after proper
 testing on your filesystems. Be cautious as inode-related issues exist on some
 filesystems and network-mounted filesystems.
 
-Symbolic links in &lt;sourceDir&gt; are neither followed nor synchronized to
-&lt;backupDir&gt;, but Zaloha prepares a restore script in its metadata directory.
+Symbolic links in &lt;sourceDir&gt;: In the absence of the <b>--followSLinksS</b> option,
+they are neither followed nor synchronized to &lt;backupDir&gt;, and Zaloha prepares
+a restore script in its metadata directory. If the <b>--followSLinksS</b> option is
+given, symbolic links on &lt;sourceDir&gt; are followed and the referenced files and
+directories are synchronized to &lt;backupDir&gt;. See section Following Symbolic
+Links for details.
 
 Zaloha does not synchronize other types of objects in &lt;sourceDir&gt; (named pipes,
 sockets, special devices, etc). These objects are considered to be part of the
@@ -412,6 +416,12 @@ key variables for whole script are defined (and can be adjusted as needed).
 
 <b>--pRevMode</b>      ... preserve modes (permission bits) during REV operations
 
+<b>--followSLinksS</b> ... follow symbolic links on &lt;sourceDir&gt;
+<b>--followSLinksB</b> ... follow symbolic links on &lt;backupDir&gt;
+                    Please see section Following Symbolic Links for details.
+
+<b>--noWarnSLinks</b>  ... suppress warnings related to symbolic links
+
 <b>--noRestore</b>     ... do not prepare scripts for the case of restore (= saves
     processing time and disk space, see optimization note below). The scripts
     for the case of restore can still be produced ex-post by manually running
@@ -478,10 +488,6 @@ key variables for whole script are defined (and can be adjusted as needed).
 <b>--noR850Hdr</b>     ... do not write header to the restore script 850
 <b>--noR860Hdr</b>     ... do not write header to the restore script 860
    (Explained in the Advanced Use of Zaloha section below).
-
-<b>--noWarnSLinks</b>  ... suppress warning about existence of symbolic links in
-                    &lt;sourceDir&gt; and the fact that they are neither followed nor
-                    synchronized to &lt;backupDir&gt;
 
 <b>--noProgress</b>    ... suppress progress messages (less screen output). If both
                     options <b>--noExec</b> and <b>--noProgress</b> are used, Zaloha does
@@ -774,6 +780,71 @@ wildcard do not match objects whose names start with a dot (.).
 </pre>
 
 
+### FOLLOWING SYMBOLIC LINKS
+
+<pre>
+Technically, the <b>--followSLinksS</b> and/or <b>--followSLinksB</b> options in Zaloha
+"just" pass the -L option to the FIND commands that scan &lt;sourceDir&gt; and/or
+&lt;backupDir&gt;. However, it takes a fair amount of text to describe the impacts:
+
+If FIND is invoked with the -L option, it returns information about the objects
+the symbolic links point to rather than the symbolic links themselves (unless
+the symbolic links are broken). Moreover, if the symbolic links point to
+directories, the FIND scans continue in that directories as if they were
+subdirectories (= symbolic links are followed).
+
+In other words: If the directory structure of &lt;sourceDir&gt; is spanned by symbolic
+links and symbolic links are followed due to the <b>--followSLinksS</b> option,
+the FIND output will contain the whole structure spanned by the symbolic links,
+BUT will not give any clue that FIND was going over the symbolic links.
+
+The same sentence holds for &lt;backupDir&gt; and the <b>--followSLinksB</b> option.
+
+Corollary 1: Independently on whether &lt;sourceDir&gt; is a plain directory structure
+or spanned by symbolic links, Zaloha will create a plain directory structure
+in &lt;backupDir&gt;. If the structure of &lt;backupDir&gt; should by spanned by symbolic
+links too (not necessarily identically to &lt;sourceDir&gt;), then the symbolic links
+and the referenced objects must be prepared in advance and the <b>--followSLinksB</b>
+option must be given to follow symbolic links on &lt;backupDir&gt; (otherwise Zaloha
+would remove the prepared symbolic links on &lt;backupDir&gt; and create real files
+and directories in place of them).
+
+Corollary 2: The restore scripts are not aware of the symbolic links that
+spanned the original structure. They will restore a plain directory structure.
+Again, if the structure of the restored directory should be spanned by symbolic
+links, then the symbolic links and the referenced objects must be prepared
+in advance. Please note that if the option <b>--followSLinksS</b> is given, the file
+820_restore_sym_links.sh will contain only the broken symbolic links (as these
+were the only symbolic links reported as symbolic links in that case).
+
+The abovesaid is not much surprising given that symbolic links are frequently
+used to place parts of directory structures to different storage media:
+The different storage media must be mounted, directories on them must be
+prepared and referenced by the symbolic links before any backup (or restore)
+operations can begin.
+
+Corner case synchronization of attributes (user ownerships, group ownerships,
+modes (permission bits)) if symbolic links are followed: the attributes are
+synchronized on the objects the symbolic links point to, not on the symbolic
+links themselves.
+
+Corner case removal operations: Eventual removal operations on places where the
+structure is held together by symbolic links are problematic. Zaloha will
+prepare the <b>REMOVE</b> (rm -f) or <b>RMDIR</b> (rmdir) operations due to the objects having
+been reported to it as files or directories. However, if the objects are in
+reality symbolic links, "rm -f" removes the symbolic links themselves, not the
+referenced objects, and "rmdir" fails altogether.
+
+Corner case loops: Loops can occur if symbolic links are in play. Zaloha can
+only rely on the FIND commands to handle them (and prevent running forever).
+GNU find, for example, contains an internal mechanism to detect loops.
+
+Technical note for the case when the start point directories themselves are
+symbolic links: Zaloha passes all start point directories to FIND with trailing
+slashes, which instructs FIND to follow them if they are symbolic links.
+</pre>
+
+
 ### TESTING, DEPLOYMENT, INTEGRATION
 
 <pre>
@@ -925,7 +996,8 @@ Corner case objects in &lt;backupDir&gt; under same paths as symbolic links in
 misleading situations in that for a symbolic link in &lt;sourceDir&gt; that points
 to an object, &lt;backupDir&gt; would contain a different object. The only exception
 is when the objects in &lt;backupDir&gt; are symbolic links as well, in which case
-they will be kept (but not changed).
+they will be kept (but not changed). Please see section Following Symbolic Links
+on when symbolic links are not reported as symbolic links by FIND.
 
 Corner case objects in &lt;backupDir&gt; under same paths as other objects (p/s/c/b/D)
 in &lt;sourceDir&gt;: The objects in &lt;backupDir&gt; will be (unavoidably) removed except
@@ -1022,9 +1094,12 @@ this results in ( 5 x 4 ) + 5 + 4 = 29 cases to be handled by AWKDIFF:
               (none)                |   26      27      28      29
   ---------------------------------------------------------------------------
 
-  Note: Hardlinks (h) cannot occur in &lt;backupDir&gt;, because the type "h" is not
+  Note 1: Hardlinks (h) cannot occur in &lt;backupDir&gt;, because the type "h" is not
   returned by FIND but determined by AWKHLINKS that can operate only on
   &lt;sourceDir&gt;.
+
+  Note 2: Please see section Following Symbolic Links on when symbolic links
+  are not reported as symbolic links by FIND.
 
 The AWKDIFF code is commented on key places to make orientation easier.
 A good case to begin with is case 6 (file in &lt;sourceDir&gt;, file in &lt;backupDir&gt;),

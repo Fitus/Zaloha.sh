@@ -214,8 +214,12 @@ hardlinks (see code of AWKHLINKS). Generally, use this feature only after proper
 testing on your filesystems. Be cautious as inode-related issues exist on some
 filesystems and network-mounted filesystems.
 
-Symbolic links in <sourceDir> are neither followed nor synchronized to
-<backupDir>, but Zaloha prepares a restore script in its metadata directory.
+Symbolic links in <sourceDir>: In the absence of the "--followSLinksS" option,
+they are neither followed nor synchronized to <backupDir>, and Zaloha prepares
+a restore script in its metadata directory. If the "--followSLinksS" option is
+given, symbolic links on <sourceDir> are followed and the referenced files and
+directories are synchronized to <backupDir>. See section Following Symbolic
+Links for details.
 
 Zaloha does not synchronize other types of objects in <sourceDir> (named pipes,
 sockets, special devices, etc). These objects are considered to be part of the
@@ -437,6 +441,12 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 
 --pRevMode      ... preserve modes (permission bits) during REV operations
 
+--followSLinksS ... follow symbolic links on <sourceDir>
+--followSLinksB ... follow symbolic links on <backupDir>
+                    Please see section Following Symbolic Links for details.
+
+--noWarnSLinks  ... suppress warnings related to symbolic links
+
 --noRestore     ... do not prepare scripts for the case of restore (= saves
     processing time and disk space, see optimization note below). The scripts
     for the case of restore can still be produced ex-post by manually running
@@ -503,10 +513,6 @@ Zaloha.sh --sourceDir=<sourceDir> --backupDir=<backupDir> [ other options ... ]
 --noR850Hdr     ... do not write header to the restore script 850
 --noR860Hdr     ... do not write header to the restore script 860
    (Explained in the Advanced Use of Zaloha section below).
-
---noWarnSLinks  ... suppress warning about existence of symbolic links in
-                    <sourceDir> and the fact that they are neither followed nor
-                    synchronized to <backupDir>
 
 --noProgress    ... suppress progress messages (less screen output). If both
                     options "--noExec" and "--noProgress" are used, Zaloha does
@@ -798,6 +804,70 @@ wildcard do not match objects whose names start with a dot (.).
 
 ###########################################################
 
+FOLLOWING SYMBOLIC LINKS
+
+Technically, the "--followSLinksS" and/or "--followSLinksB" options in Zaloha
+"just" pass the -L option to the FIND commands that scan <sourceDir> and/or
+<backupDir>. However, it takes a fair amount of text to describe the impacts:
+
+If FIND is invoked with the -L option, it returns information about the objects
+the symbolic links point to rather than the symbolic links themselves (unless
+the symbolic links are broken). Moreover, if the symbolic links point to
+directories, the FIND scans continue in that directories as if they were
+subdirectories (= symbolic links are followed).
+
+In other words: If the directory structure of <sourceDir> is spanned by symbolic
+links and symbolic links are followed due to the "--followSLinksS" option,
+the FIND output will contain the whole structure spanned by the symbolic links,
+BUT will not give any clue that FIND was going over the symbolic links.
+
+The same sentence holds for <backupDir> and the "--followSLinksB" option.
+
+Corollary 1: Independently on whether <sourceDir> is a plain directory structure
+or spanned by symbolic links, Zaloha will create a plain directory structure
+in <backupDir>. If the structure of <backupDir> should by spanned by symbolic
+links too (not necessarily identically to <sourceDir>), then the symbolic links
+and the referenced objects must be prepared in advance and the "--followSLinksB"
+option must be given to follow symbolic links on <backupDir> (otherwise Zaloha
+would remove the prepared symbolic links on <backupDir> and create real files
+and directories in place of them).
+
+Corollary 2: The restore scripts are not aware of the symbolic links that
+spanned the original structure. They will restore a plain directory structure.
+Again, if the structure of the restored directory should be spanned by symbolic
+links, then the symbolic links and the referenced objects must be prepared
+in advance. Please note that if the option "--followSLinksS" is given, the file
+820_restore_sym_links.sh will contain only the broken symbolic links (as these
+were the only symbolic links reported as symbolic links in that case).
+
+The abovesaid is not much surprising given that symbolic links are frequently
+used to place parts of directory structures to different storage media:
+The different storage media must be mounted, directories on them must be
+prepared and referenced by the symbolic links before any backup (or restore)
+operations can begin.
+
+Corner case synchronization of attributes (user ownerships, group ownerships,
+modes (permission bits)) if symbolic links are followed: the attributes are
+synchronized on the objects the symbolic links point to, not on the symbolic
+links themselves.
+
+Corner case removal operations: Eventual removal operations on places where the
+structure is held together by symbolic links are problematic. Zaloha will
+prepare the REMOVE (rm -f) or RMDIR (rmdir) operations due to the objects having
+been reported to it as files or directories. However, if the objects are in
+reality symbolic links, "rm -f" removes the symbolic links themselves, not the
+referenced objects, and "rmdir" fails altogether.
+
+Corner case loops: Loops can occur if symbolic links are in play. Zaloha can
+only rely on the FIND commands to handle them (and prevent running forever).
+GNU find, for example, contains an internal mechanism to detect loops.
+
+Technical note for the case when the start point directories themselves are
+symbolic links: Zaloha passes all start point directories to FIND with trailing
+slashes, which instructs FIND to follow them if they are symbolic links.
+
+###########################################################
+
 TESTING, DEPLOYMENT, INTEGRATION
 
 First, test Zaloha on a small and noncritical set of your data. Although Zaloha
@@ -947,7 +1017,8 @@ Corner case objects in <backupDir> under same paths as symbolic links in
 misleading situations in that for a symbolic link in <sourceDir> that points
 to an object, <backupDir> would contain a different object. The only exception
 is when the objects in <backupDir> are symbolic links as well, in which case
-they will be kept (but not changed).
+they will be kept (but not changed). Please see section Following Symbolic Links
+on when symbolic links are not reported as symbolic links by FIND.
 
 Corner case objects in <backupDir> under same paths as other objects (p/s/c/b/D)
 in <sourceDir>: The objects in <backupDir> will be (unavoidably) removed except
@@ -1043,9 +1114,12 @@ this results in ( 5 x 4 ) + 5 + 4 = 29 cases to be handled by AWKDIFF:
               (none)                |   26      27      28      29
   ---------------------------------------------------------------------------
 
-  Note: Hardlinks (h) cannot occur in <backupDir>, because the type "h" is not
+  Note 1: Hardlinks (h) cannot occur in <backupDir>, because the type "h" is not
   returned by FIND but determined by AWKHLINKS that can operate only on
   <sourceDir>.
+
+  Note 2: Please see section Following Symbolic Links on when symbolic links
+  are not reported as symbolic links by FIND.
 
 The AWKDIFF code is commented on key places to make orientation easier.
 A good case to begin with is case 6 (file in <sourceDir>, file in <backupDir>),
@@ -1453,6 +1527,9 @@ pMode=0
 pRevUser=0
 pRevGroup=0
 pRevMode=0
+followSLinksS=0
+followSLinksB=0
+noWarnSLinks=0
 noRestore=0
 optimCSV=0
 metaDir=
@@ -1474,7 +1551,6 @@ noR830Hdr=0
 noR840Hdr=0
 noR850Hdr=0
 noR860Hdr=0
-noWarnSLinks=0
 noProgress=0
 color=0
 mawk=0
@@ -1488,48 +1564,50 @@ do
     --backupDir=*)       opt_dupli_check ${backupDirPassed} "${tmpVal%%=*}";  backupDir="${tmpVal#*=}";  backupDirPassed=1 ;;
     --findSourceOps=*)   findSourceOps="${findSourceOps}${tmpVal#*=} " ;;
     --findGeneralOps=*)  findGeneralOps="${findGeneralOps}${tmpVal#*=} ";  findGeneralOpsPassed=1 ;;
-    --noExec)            opt_dupli_check ${noExec} "${tmpVal}";        noExec=1 ;;
-    --noRemove)          opt_dupli_check ${noRemove} "${tmpVal}";      noRemove=1 ;;
-    --revNew)            opt_dupli_check ${revNew} "${tmpVal}";        revNew=1 ;;
-    --revUp)             opt_dupli_check ${revUp} "${tmpVal}";         revUp=1 ;;
-    --hLinks)            opt_dupli_check ${hLinks} "${tmpVal}";        hLinks=1 ;;
-    --ok2s)              opt_dupli_check ${ok2s} "${tmpVal}";          ok2s=1 ;;
-    --ok3600s)           opt_dupli_check ${ok3600s} "${tmpVal}";       ok3600s=1 ;;
-    --byteByByte)        opt_dupli_check ${byteByByte} "${tmpVal}";    byteByByte=1 ;;
-    --noUnlink)          opt_dupli_check ${noUnlink} "${tmpVal}";      noUnlink=1 ;;
-    --touch)             opt_dupli_check ${touch} "${tmpVal}";         touch=1 ;;
-    --pUser)             opt_dupli_check ${pUser} "${tmpVal}";         pUser=1 ;;
-    --pGroup)            opt_dupli_check ${pGroup} "${tmpVal}";        pGroup=1 ;;
-    --pMode)             opt_dupli_check ${pMode} "${tmpVal}";         pMode=1 ;;
-    --pRevUser)          opt_dupli_check ${pRevUser} "${tmpVal}";      pRevUser=1 ;;
-    --pRevGroup)         opt_dupli_check ${pRevGroup} "${tmpVal}";     pRevGroup=1 ;;
-    --pRevMode)          opt_dupli_check ${pRevMode} "${tmpVal}";      pRevMode=1 ;;
-    --noRestore)         opt_dupli_check ${noRestore} "${tmpVal}";     noRestore=1 ;;
-    --optimCSV)          opt_dupli_check ${optimCSV} "${tmpVal}";      optimCSV=1 ;;
+    --noExec)            opt_dupli_check ${noExec} "${tmpVal}";         noExec=1 ;;
+    --noRemove)          opt_dupli_check ${noRemove} "${tmpVal}";       noRemove=1 ;;
+    --revNew)            opt_dupli_check ${revNew} "${tmpVal}";         revNew=1 ;;
+    --revUp)             opt_dupli_check ${revUp} "${tmpVal}";          revUp=1 ;;
+    --hLinks)            opt_dupli_check ${hLinks} "${tmpVal}";         hLinks=1 ;;
+    --ok2s)              opt_dupli_check ${ok2s} "${tmpVal}";           ok2s=1 ;;
+    --ok3600s)           opt_dupli_check ${ok3600s} "${tmpVal}";        ok3600s=1 ;;
+    --byteByByte)        opt_dupli_check ${byteByByte} "${tmpVal}";     byteByByte=1 ;;
+    --noUnlink)          opt_dupli_check ${noUnlink} "${tmpVal}";       noUnlink=1 ;;
+    --touch)             opt_dupli_check ${touch} "${tmpVal}";          touch=1 ;;
+    --pUser)             opt_dupli_check ${pUser} "${tmpVal}";          pUser=1 ;;
+    --pGroup)            opt_dupli_check ${pGroup} "${tmpVal}";         pGroup=1 ;;
+    --pMode)             opt_dupli_check ${pMode} "${tmpVal}";          pMode=1 ;;
+    --pRevUser)          opt_dupli_check ${pRevUser} "${tmpVal}";       pRevUser=1 ;;
+    --pRevGroup)         opt_dupli_check ${pRevGroup} "${tmpVal}";      pRevGroup=1 ;;
+    --pRevMode)          opt_dupli_check ${pRevMode} "${tmpVal}";       pRevMode=1 ;;
+    --followSLinksS)     opt_dupli_check ${followSLinksS} "${tmpVal}";  followSLinksS=1 ;;
+    --followSLinksB)     opt_dupli_check ${followSLinksB} "${tmpVal}";  followSLinksB=1 ;;
+    --noWarnSLinks)      opt_dupli_check ${noWarnSLinks} "${tmpVal}";   noWarnSLinks=1 ;;
+    --noRestore)         opt_dupli_check ${noRestore} "${tmpVal}";      noRestore=1 ;;
+    --optimCSV)          opt_dupli_check ${optimCSV} "${tmpVal}";       optimCSV=1 ;;
     --metaDir=*)         opt_dupli_check ${metaDirPassed} "${tmpVal%%=*}";  metaDir="${tmpVal#*=}";  metaDirPassed=1 ;;
-    --noDirChecks)       opt_dupli_check ${noDirChecks} "${tmpVal}";   noDirChecks=1 ;;
-    --noLastRun)         opt_dupli_check ${noLastRun} "${tmpVal}";     noLastRun=1 ;;
-    --noIdentCheck)      opt_dupli_check ${noIdentCheck} "${tmpVal}";  noIdentCheck=1 ;;
-    --noFindSource)      opt_dupli_check ${noFindSource} "${tmpVal}";  noFindSource=1 ;;
-    --noFindBackup)      opt_dupli_check ${noFindBackup} "${tmpVal}";  noFindBackup=1 ;;
-    --noExec1Hdr)        opt_dupli_check ${noExec1Hdr} "${tmpVal}";    noExec1Hdr=1 ;;
-    --noExec2Hdr)        opt_dupli_check ${noExec2Hdr} "${tmpVal}";    noExec2Hdr=1 ;;
-    --noExec3Hdr)        opt_dupli_check ${noExec3Hdr} "${tmpVal}";    noExec3Hdr=1 ;;
-    --noExec4Hdr)        opt_dupli_check ${noExec4Hdr} "${tmpVal}";    noExec4Hdr=1 ;;
-    --noExec5Hdr)        opt_dupli_check ${noExec5Hdr} "${tmpVal}";    noExec5Hdr=1 ;;
-    --noR800Hdr)         opt_dupli_check ${noR800Hdr} "${tmpVal}";     noR800Hdr=1 ;;
-    --noR810Hdr)         opt_dupli_check ${noR810Hdr} "${tmpVal}";     noR810Hdr=1 ;;
-    --noR820Hdr)         opt_dupli_check ${noR820Hdr} "${tmpVal}";     noR820Hdr=1 ;;
-    --noR830Hdr)         opt_dupli_check ${noR830Hdr} "${tmpVal}";     noR830Hdr=1 ;;
-    --noR840Hdr)         opt_dupli_check ${noR840Hdr} "${tmpVal}";     noR840Hdr=1 ;;
-    --noR850Hdr)         opt_dupli_check ${noR850Hdr} "${tmpVal}";     noR850Hdr=1 ;;
-    --noR860Hdr)         opt_dupli_check ${noR860Hdr} "${tmpVal}";     noR860Hdr=1 ;;
-    --noWarnSLinks)      opt_dupli_check ${noWarnSLinks} "${tmpVal}";  noWarnSLinks=1 ;;
-    --noProgress)        opt_dupli_check ${noProgress} "${tmpVal}";    noProgress=1 ;;
-    --color)             opt_dupli_check ${color} "${tmpVal}";         color=1 ;;
-    --mawk)              opt_dupli_check ${mawk} "${tmpVal}";          mawk=1 ;;
-    --lTest)             opt_dupli_check ${lTest} "${tmpVal}";         lTest=1 ;;
-    --help)              opt_dupli_check ${help} "${tmpVal}";          help=1 ;;
+    --noDirChecks)       opt_dupli_check ${noDirChecks} "${tmpVal}";    noDirChecks=1 ;;
+    --noLastRun)         opt_dupli_check ${noLastRun} "${tmpVal}";      noLastRun=1 ;;
+    --noIdentCheck)      opt_dupli_check ${noIdentCheck} "${tmpVal}";   noIdentCheck=1 ;;
+    --noFindSource)      opt_dupli_check ${noFindSource} "${tmpVal}";   noFindSource=1 ;;
+    --noFindBackup)      opt_dupli_check ${noFindBackup} "${tmpVal}";   noFindBackup=1 ;;
+    --noExec1Hdr)        opt_dupli_check ${noExec1Hdr} "${tmpVal}";     noExec1Hdr=1 ;;
+    --noExec2Hdr)        opt_dupli_check ${noExec2Hdr} "${tmpVal}";     noExec2Hdr=1 ;;
+    --noExec3Hdr)        opt_dupli_check ${noExec3Hdr} "${tmpVal}";     noExec3Hdr=1 ;;
+    --noExec4Hdr)        opt_dupli_check ${noExec4Hdr} "${tmpVal}";     noExec4Hdr=1 ;;
+    --noExec5Hdr)        opt_dupli_check ${noExec5Hdr} "${tmpVal}";     noExec5Hdr=1 ;;
+    --noR800Hdr)         opt_dupli_check ${noR800Hdr} "${tmpVal}";      noR800Hdr=1 ;;
+    --noR810Hdr)         opt_dupli_check ${noR810Hdr} "${tmpVal}";      noR810Hdr=1 ;;
+    --noR820Hdr)         opt_dupli_check ${noR820Hdr} "${tmpVal}";      noR820Hdr=1 ;;
+    --noR830Hdr)         opt_dupli_check ${noR830Hdr} "${tmpVal}";      noR830Hdr=1 ;;
+    --noR840Hdr)         opt_dupli_check ${noR840Hdr} "${tmpVal}";      noR840Hdr=1 ;;
+    --noR850Hdr)         opt_dupli_check ${noR850Hdr} "${tmpVal}";      noR850Hdr=1 ;;
+    --noR860Hdr)         opt_dupli_check ${noR860Hdr} "${tmpVal}";      noR860Hdr=1 ;;
+    --noProgress)        opt_dupli_check ${noProgress} "${tmpVal}";     noProgress=1 ;;
+    --color)             opt_dupli_check ${color} "${tmpVal}";          color=1 ;;
+    --mawk)              opt_dupli_check ${mawk} "${tmpVal}";           mawk=1 ;;
+    --lTest)             opt_dupli_check ${lTest} "${tmpVal}";          lTest=1 ;;
+    --help)              opt_dupli_check ${help} "${tmpVal}";           help=1 ;;
     *) error_exit "Unknown option ${tmpVal}, get help via Zaloha.sh --help" ;;
   esac
 done
@@ -1804,6 +1882,9 @@ ${TRIPLET}${FSTAB}pMode${FSTAB}${pMode}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}pRevUser${FSTAB}${pRevUser}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}pRevGroup${FSTAB}${pRevGroup}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}pRevMode${FSTAB}${pRevMode}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}followSLinksS${FSTAB}${followSLinksS}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}followSLinksB${FSTAB}${followSLinksB}${FSTAB}${TRIPLET}
+${TRIPLET}${FSTAB}noWarnSLinks${FSTAB}${noWarnSLinks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noRestore${FSTAB}${noRestore}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}optimCSV${FSTAB}${optimCSV}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}metaDir${FSTAB}${metaDir}${FSTAB}${TRIPLET}
@@ -1828,7 +1909,6 @@ ${TRIPLET}${FSTAB}noR830Hdr${FSTAB}${noR830Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR840Hdr${FSTAB}${noR840Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR850Hdr${FSTAB}${noR850Hdr}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noR860Hdr${FSTAB}${noR860Hdr}${FSTAB}${TRIPLET}
-${TRIPLET}${FSTAB}noWarnSLinks${FSTAB}${noWarnSLinks}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}noProgress${FSTAB}${noProgress}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}color${FSTAB}${color}${FSTAB}${TRIPLET}
 ${TRIPLET}${FSTAB}mawk${FSTAB}${mawk}${FSTAB}${TRIPLET}
@@ -1960,11 +2040,15 @@ BEGIN {
   gsub( TRIPLETBREGEX, BSLASH, outFile )
   gsub( QUOTEREGEX, QUOTEESC, startPoint )
   gsub( QUOTEREGEX, QUOTEESC, outFile )
-  cmd = "find '" startPoint "'"  # FIND command being constructed
+  cmd = "find"                   # FIND command being constructed
   wrd = ""                       # word of FIND command being constructed
   iwd = 0                        # flag inside of word (0=before, 1=in, 2=after)
   idq = 0                        # flag inside of double-quote
   dqu = 0                        # flag double-quote remembered
+  if ( 1 == followSLinks ) {
+    cmd = cmd " -L"
+  }
+  cmd = cmd " '" startPoint "'"
   findOps = findOps " "
   for ( i = 1; i <= length( findOps ); i++ ) {
     c = substr( findOps, i, 1 )
@@ -2060,6 +2144,7 @@ start_progress "Parsing"
 ${awk} -f "${f106}"                            \
        -v sourceBackup="L"                     \
        -v startPoint="${metaDirAwk}"           \
+       -v followSLinks=0                       \
        -v findOps="${findLastRunOpsFinalAwk}"  \
        -v tripletDSepV="${metaDirPattAwk}"     \
        -v outFile="${f300Awk}"                 \
@@ -2068,6 +2153,7 @@ ${awk} -f "${f106}"                            \
 ${awk} -f "${f106}"                            \
        -v sourceBackup="S"                     \
        -v startPoint="${sourceDirAwk}"         \
+       -v followSLinks=${followSLinksS}        \
        -v findOps="${findSourceOpsFinalAwk}"   \
        -v tripletDSepV="${sourceDirPattAwk}"   \
        -v outFile="${f310Awk}"                 \
@@ -2076,6 +2162,7 @@ ${awk} -f "${f106}"                            \
 ${awk} -f "${f106}"                            \
        -v sourceBackup="B"                     \
        -v startPoint="${backupDirAwk}"         \
+       -v followSLinks=${followSLinksB}        \
        -v findOps="${findBackupOpsFinalAwk}"   \
        -v tripletDSepV="${backupDirPattAwk}"   \
        -v outFile="${f320Awk}"                 \
@@ -2664,7 +2751,11 @@ END {
     process_previous_record()
   }
   if (( 0 == noWarnSLinks ) && ( 0 != slc )) {
-    warning( slc " symbolic links in <sourceDir>: they are neither followed nor synchronized to <backupDir>" )
+    if ( 1 == followSLinksS ) {
+      warning( slc " broken symbolic link(s) in <sourceDir>" )
+    } else {
+      warning( slc " symbolic link(s) in <sourceDir> that are neither followed nor synchronized to <backupDir>" )
+    }
   }
   if ( 0 != idc ) {
     if ( "" == idp ) {
@@ -2693,20 +2784,21 @@ stop_progress
 
 start_progress "Differences processing"
 
-${awk} -f "${f170}"                     \
-       -v noRemove=${noRemove}          \
-       -v revNew=${revNew}              \
-       -v revUp=${revUp}                \
-       -v ok2s=${ok2s}                  \
-       -v ok3600s=${ok3600s}            \
-       -v noUnlink=${noUnlink}          \
-       -v pUser=${pUser}                \
-       -v pGroup=${pGroup}              \
-       -v pMode=${pMode}                \
-       -v noLastRun=${noLastRun}        \
-       -v noIdentCheck=${noIdentCheck}  \
-       -v noWarnSLinks=${noWarnSLinks}  \
-       "${fLastRun}" "${f370}"          > "${f380}"
+${awk} -f "${f170}"                       \
+       -v noRemove=${noRemove}            \
+       -v revNew=${revNew}                \
+       -v revUp=${revUp}                  \
+       -v ok2s=${ok2s}                    \
+       -v ok3600s=${ok3600s}              \
+       -v noUnlink=${noUnlink}            \
+       -v pUser=${pUser}                  \
+       -v pGroup=${pGroup}                \
+       -v pMode=${pMode}                  \
+       -v followSLinksS=${followSLinksS}  \
+       -v noWarnSLinks=${noWarnSLinks}    \
+       -v noLastRun=${noLastRun}          \
+       -v noIdentCheck=${noIdentCheck}    \
+       "${fLastRun}" "${f370}"            > "${f380}"
 
 optim_csv_after_use "${f370}"
 
