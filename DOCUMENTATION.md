@@ -36,12 +36,15 @@ ext4 -&gt; FAT): not allowed characters in filenames, filename uppercase
 conversions, file size limits, etc.
 
 No writing on either directory may occur while Zaloha runs (no file locking is
-implemented). In demanding IT operations where backup must run concurrently with
-writing, a higher class of backup solution should be deployed, like storage
-snapshots (i.e. functionality that must be supported by the underlying
-OS/hardware). If either directory contains data files of running databases, then
-they must be excluded from backups on file level, and database backups must be
-implemented by dedicated solutions provided by the database vendor.
+implemented). In high-availability IT operations, a higher class of backup
+solution should be deployed, based on taking filesystem snapshots at times when
+writing processes are stopped for a short instant (i.e. functionality that must
+be supported by the underlying OS). If either directory contains data files
+of running databases, then they must be excluded from backups on file level.
+Databases have their own logic of backups, replications and failovers, usually
+based on transactional logs, and it is plainly wrong to intervene with generic
+tools that operate on files and directories. Dedicated tools provided by the
+database vendor shall be used.
 
 Handling of "weird" characters in filenames was a special focus during
 development of Zaloha (details below).
@@ -70,7 +73,8 @@ Exec1:  unavoidable removals from &lt;backupDir&gt; (objects of conflicting type
 <b>REMOVE</b>    regular remove file from &lt;backupDir&gt;
 <b>REMOVE.!</b>  remove file from &lt;backupDir&gt; which is newer than the
           last run of Zaloha
-<b>REMOVE.x</b>  remove other object in &lt;backupDir&gt;, x = object type (l/p/s/c/b/D)
+<b>REMOVE.l</b>  remove symbolic link from &lt;backupDir&gt;
+<b>REMOVE.x</b>  remove other object from &lt;backupDir&gt;, x = object type (p/s/c/b/D)
 
 Exec2:  copy files/directories to &lt;backupDir&gt; which exist only in &lt;sourceDir&gt;,
         or files which are newer in &lt;sourceDir&gt;
@@ -81,7 +85,7 @@ Exec2:  copy files/directories to &lt;backupDir&gt; which exist only in &lt;sour
 <b>UPDATE.!</b>  update file in &lt;backupDir&gt; which is newer than the last run of Zaloha
 <b>UPDATE.?</b>  update file in &lt;backupDir&gt; by a file in &lt;sourceDir&gt; which is not newer
           (or not newer by 3600 secs if option <b>--ok3600s</b> is given plus
-           eventual 2 secs FAT tolerance)
+           an eventual 2 secs FAT tolerance)
 <b>unl.UP</b>    unlink file in &lt;backupDir&gt; + <b>UPDATE</b> (can be switched off via the
           <b>--noUnlink</b> option, see below)
 <b>unl.UP.!</b>  unlink file in &lt;backupDir&gt; + <b>UPDATE.!</b> (can be switched off via the
@@ -110,7 +114,8 @@ Exec4:  remaining removals of obsolete files/directories from &lt;backupDir&gt;
 <b>REMOVE</b>    regular remove file from &lt;backupDir&gt;
 <b>REMOVE.!</b>  remove file from &lt;backupDir&gt; which is newer than the
           last run of Zaloha
-<b>REMOVE.x</b>  remove other object in &lt;backupDir&gt;, x = object type (l/p/s/c/b/D)
+<b>REMOVE.l</b>  remove symbolic link from &lt;backupDir&gt;
+<b>REMOVE.x</b>  remove other object from &lt;backupDir&gt;, x = object type (p/s/c/b/D)
 
 Exec5:  updates resulting from optional "byte by byte" comparing of files
         (optional feature, can be activated via the <b>--byteByByte</b> option)
@@ -149,13 +154,13 @@ Exec2:
 Files and directories which exist only in &lt;sourceDir&gt; are copied to &lt;backupDir&gt;
 (action codes <b>NEW</b> and <b>MKDIR</b>).
 
-Zaloha "updates" the file in &lt;backupDir&gt; (action code <b>UPDATE</b>) if the same file
-exists in both &lt;sourceDir&gt; and &lt;backupDir&gt; and the comparisons of file size and
-modification time indicate the necessity of this "update". If the file in
-&lt;backupDir&gt; is multiply linked (hardlinked), Zaloha removes (unlinks) it first,
-to prevent "updating" a multiply linked file, which could lead to follow-up
-effects (action code <b>unl.UP</b>). This unlinking can be switched off via the
-<b>--noUnlink</b> option.
+Zaloha "updates" files in &lt;backupDir&gt; (action code <b>UPDATE</b>) if files exist under
+same paths in both &lt;sourceDir&gt; and &lt;backupDir&gt; and the comparisons of file sizes
+and modification times result in needed synchronization of the files. If the
+files in &lt;backupDir&gt; are multiply linked (hardlinked), Zaloha removes (unlinks)
+them first (action code <b>unl.UP</b>), to prevent "updating" multiply linked files,
+which could lead to follow-up effects. This unlinking can be switched off via
+the <b>--noUnlink</b> option.
 
 If the files differ only in attributes (u=user ownership, g=group ownership,
 m=mode), and attribute synchronization is switched on via the <b>--pUser,</b>
@@ -217,13 +222,15 @@ That work should be "reverse-synchronized" from the Linux server (&lt;backupDir&
 back to the Windows notebook (&lt;sourceDir&gt;) (of course, assumed that there is no
 conflict between the work on the notebook and the work on the server).
 
-<b>REV.NEW:</b> If a standalone file in &lt;backupDir&gt; is newer than the last run of
-Zaloha, and the <b>--revNew</b> option is given, then Zaloha reverse-copies that file
-to &lt;sourceDir&gt; (<b>REV.NEW</b>) including all necessary parent directories (<b>REV.MKDI</b>).
+<b>REV.NEW:</b> If standalone files in &lt;backupDir&gt; are newer than the last run of
+Zaloha, and the <b>--revNew</b> option is given, then Zaloha reverse-copies that
+files to &lt;sourceDir&gt; (action code <b>REV.NEW</b>) including all necessary parent
+directories (action code <b>REV.MKDI</b>).
 
-<b>REV.UP:</b> If the same file exists in both &lt;sourceDir&gt; and &lt;backupDir&gt;, and the
-file in &lt;backupDir&gt; is newer, and the <b>--revUp</b> option is given, then Zaloha
-uses that file to reverse-update the older file in &lt;sourceDir&gt; (<b>REV.UP</b>).
+<b>REV.UP:</b> If files exist under same paths in both &lt;sourceDir&gt; and &lt;backupDir&gt;,
+and the files in &lt;backupDir&gt; are newer, and the <b>--revUp</b> option is given,
+then Zaloha uses that files to reverse-update the older files in &lt;sourceDir&gt;
+(action code <b>REV.UP</b>).
 
 Optionally, to preserve attributes during the <b>REV.MKDI,</b> <b>REV.NEW</b> and <b>REV.UP</b>
 operations: use options <b>--pRevUser,</b> <b>--pRevGroup</b> and <b>--pRevMode.</b>
@@ -235,7 +242,7 @@ files in &lt;sourceDir&gt; always update files in &lt;backupDir&gt; if they diff
 
 Reverse-synchronization to &lt;sourceDir&gt; increases the overall complexity of the
 solution. Use it only in the interactive regime of Zaloha, where human oversight
-and confirmation of prepared actions are in place.
+and confirmation of the prepared actions are in place.
 Do not use it in automatic operations.
 
 Exec4:
@@ -264,11 +271,11 @@ Zaloha updates files in &lt;backupDir&gt; for which the optional "byte by byte"
 comparing revealed that they are in fact not identical (despite appearing
 identical by looking at their file sizes and modification times).
 
-Action codes are <b>UPDATE.b</b> and <b>unl.UP.b</b> (the latter is update with prior
+The action codes are <b>UPDATE.b</b> and <b>unl.UP.b</b> (the latter is update with prior
 unlinking of multiply linked target file, as described under Exec2).
 
 Please note that these actions might indicate deeper problems like storage
-corruption (or even spoofing attempts), and should be actually perceived
+corruption (or even a cyber security issue), and should be actually perceived
 as surprises.
 
 This step is optional and can be activated via the <b>--byteByByte</b> option.
@@ -278,7 +285,7 @@ Metadata directory of Zaloha
 Zaloha creates a metadata directory: &lt;backupDir&gt;/.Zaloha_metadata. The location
 of the metadata directory can be changed via the <b>--metaDir</b> option.
 
-The purposes of individual files are described as comments in program code.
+The purposes of the individual files are described as comments in program code.
 Briefly, they are:
 
  * AWK program files (produced from "here documents" in Zaloha)
@@ -300,8 +307,8 @@ multiple lines per "record".
 In some situations, the existence of Zaloha metadata directory is unwanted after
 Zaloha finishes. In such cases, put a command to remove it to the wrapper script
 that invokes Zaloha. At the same time, use the option <b>--noLastRun</b> to prevent
-Zaloha from running FIND on file 999 in Zaloha metadata directory (to obtain
-time of the last run of Zaloha). Please note that by not keeping the Zaloha
+Zaloha from running FIND on file 999 in Zaloha metadata directory to obtain the
+time of the last run of Zaloha. Please note that by not keeping the Zaloha
 metadata directory, you sacrifice some functionality (see <b>--noLastRun</b> option
 below), and you loose the CSV metadata for an eventual analysis of problems and
 you loose the shellscripts for case of restore.
@@ -349,11 +356,10 @@ key variables for whole script are defined (and can be adjusted as needed).
 
 <b>--noExec</b>        ... needed if Zaloha is invoked automatically: do not ask,
     do not execute the actions, but still prepare the scripts. The prepared
-    scripts then do not contain shell tracing and they do not contain the
-    "set -e" instruction. This means that the scripts ignore individual failed
-    commands and try to do as much work as possible, which is a behavior
-    different from the interactive regime, where scripts are traced and halt
-    on the first error.
+    scripts then will not contain shell tracing and the "set -e" instruction.
+    This means that the scripts will ignore individual failed commands and try
+    to do as much work as possible, which is a behavior different from the
+    interactive regime, where scripts are traced and halt on the first error.
 
 <b>--noRemove</b>      ... do not remove files, directories and symbolic links that
     are standalone in &lt;backupDir&gt;. This option is useful when &lt;backupDir&gt; should
@@ -514,8 +520,7 @@ key variables for whole script are defined (and can be adjusted as needed).
 Optimization note: If Zaloha operates on directories with huge numbers of files,
 especially small ones, then the size of metadata plus the size of scripts for
 the case of restore may exceed the size of the files themselves. If this leads
-to hitting of storage and/or processing time limits, use options <b>--noRestore</b>
-and <b>--optimCSV.</b>
+to problems, use options <b>--noRestore</b> and <b>--optimCSV.</b>
 
 Zaloha must be run by a user with sufficient privileges to read &lt;sourceDir&gt; and
 to write and perform other required actions on &lt;backupDir&gt;. In case of the REV
@@ -551,7 +556,7 @@ obtain all needed information from a directory in one scan (= one process),
 which is efficient. GNU find supports the -printf operand, but some older
 FIND implementations don't, so they cannot be used with Zaloha.
 
-The FIND scans of &lt;sourceDir&gt; and &lt;backupDir&gt; can be modified by two options:
+The FIND scans of &lt;sourceDir&gt; and &lt;backupDir&gt; can be controlled by two options:
 Option <b>--findSourceOps</b> are additional operands for the FIND command that scans
 &lt;sourceDir&gt; only, and the option <b>--findGeneralOps</b> are additional operands
 for both FIND commands (scans of both &lt;sourceDir&gt; and &lt;backupDir&gt;).
@@ -562,11 +567,12 @@ in Zaloha part-wise, e.g. expression by expression.
 
 Difference between &lt;findSourceOps&gt; and &lt;findGeneralOps&gt;
 -------------------------------------------------------
-&lt;findSourceOps&gt; applies only to &lt;sourceDir&gt;. If a file in &lt;sourceDir&gt; is
-excluded by &lt;findSourceOps&gt; and the same file exists in &lt;backupDir&gt;, then
-Zaloha evaluates the file in &lt;backupDir&gt; as obsolete (= removes it, unless the
-<b>--noRemove</b> option is given, or eventually even attempts to reverse-synchronize
-it (which leads to one of the corner cases (see the Corner Cases section)).
+&lt;findSourceOps&gt; applies only to &lt;sourceDir&gt;. If files in &lt;sourceDir&gt; are
+excluded by &lt;findSourceOps&gt; and files exist in &lt;backupDir&gt; under same paths,
+then Zaloha evaluates the files in &lt;backupDir&gt; as obsolete (= removes them,
+unless the <b>--noRemove</b> option is given, or eventually even attempts to
+reverse-synchronize them (which leads to one of the corner cases
+(see the Corner Cases section)).
 
 On the contrary, the files excluded by &lt;findGeneralOps&gt; are not visible to
 Zaloha at all, neither in &lt;sourceDir&gt; nor in &lt;backupDir&gt;, so Zaloha will not
@@ -815,7 +821,7 @@ Again, if the structure of the restored directory should be spanned by symbolic
 links, then the symbolic links and the referenced objects must be prepared
 in advance. Please note that if the option <b>--followSLinksS</b> is given, the file
 820_restore_sym_links.sh will contain only the broken symbolic links (as these
-were the only symbolic links reported as symbolic links in that case).
+were the only symbolic links reported by FIND as symbolic links in that case).
 
 The abovesaid is not much surprising given that symbolic links are frequently
 used to place parts of directory structures to different storage media:
@@ -912,7 +918,7 @@ The process which invokes Zaloha in automatic regime should function as follows
 <pre>
 To detect which files need synchronization, Zaloha compares file sizes and
 modification times. If the file sizes differ, synchronization is needed.
-The modification time is more tricky:
+The modification times are more complex:
 
  * If one of the filesystems is FAT (i.e. FAT16, VFAT, FAT32), Zaloha tolerates
    differences of +/- 2 seconds. This is necessary because FAT rounds the
@@ -939,10 +945,6 @@ The modification time is more tricky:
    obtained). This last note is relevant especially if &lt;metaDir&gt; is located
    outside of &lt;backupDir&gt; (which is achievable via the <b>--metaDir</b> option).
 
-It is possible (but not recommended) for &lt;backupDir&gt; to be a subdirectory of
-&lt;sourceDir&gt; and vice versa. In such cases, FIND expressions to avoid recursive
-copying must be passed in via &lt;findGeneralOps&gt;.
-
 In some situations (e.g. Linux Samba + Linux Samba client),
 cp --preserve=timestamps does not preserve modification timestamps (unless on
 empty files). In that case, Zaloha should be instructed (via the <b>--touch</b>
@@ -951,21 +953,21 @@ solution. In the scripts for case of restore, touch commands are used
 unconditionally.
 
 Corner case <b>REV.NEW</b> with namespace on &lt;sourceDir&gt; needed for <b>REV.MKDI</b> or <b>REV.NEW</b>
-actions is occupied by object of conflicting type: The file in &lt;backupDir&gt;
-will not be reverse-copied to &lt;sourceDir&gt;, but removed. As this file must be
-newer than the last run of Zaloha, the action will be <b>REMOVE.!.</b>
+actions is occupied by objects of conflicting types: The files in &lt;backupDir&gt;
+will not be reverse-copied to &lt;sourceDir&gt;, but removed. As these files must be
+newer than the last run of Zaloha, the actions will be <b>REMOVE.!.</b>
 
-Corner case <b>REV.NEW</b> with <b>--findSourceOps:</b> If the same file exists in both
-&lt;sourceDir&gt; and &lt;backupDir&gt;, and in &lt;sourceDir&gt; that file is masked by
-&lt;findSourceOps&gt; and in &lt;backupDir&gt; that file is newer than the last run of
-Zaloha, <b>REV.NEW</b> on that file will be prepared. This is an error which Zaloha
-is unable to detect. Hence, the shellscript for Exec3 contains a test that
-throws an error in such situation.
+Corner case <b>REV.NEW</b> with <b>--findSourceOps:</b> If files exist under same paths in
+both &lt;sourceDir&gt; and &lt;backupDir&gt;, and in &lt;sourceDir&gt; the files is masked by
+&lt;findSourceOps&gt; and in &lt;backupDir&gt; the corresponding files are newer than the
+last run of Zaloha, the <b>REV.NEW</b> actions prepared by Zaloha are wrong. This is
+an error which Zaloha is unable to detect. Hence, the shellscript for Exec3
+contains a test that throws an error in such situations.
 
 Corner case <b>REV.UP</b> with <b>--ok3600s:</b> The <b>--ok3600s</b> option makes it harder
 to determine which file is newer (decision <b>UPDATE</b> vs <b>REV.UP</b>). The implemented
 solution for that case is that for <b>REV.UP,</b> the &lt;backupDir&gt; file must be newer
-by more than 3600 seconds (plus eventual 2 secs FAT tolerance).
+by more than 3600 seconds (plus an eventual 2 secs FAT tolerance).
 
 Corner case <b>--hLinks</b> with new link(s) to same file added or removed: The
 assignment of what link will be kept as "file" (f) and what links will be tagged
@@ -994,14 +996,15 @@ hardlinked file in &lt;sourceDir&gt;, &lt;backupDir&gt; would contain a differen
 Corner case objects in &lt;backupDir&gt; under same paths as symbolic links in
 &lt;sourceDir&gt;: The objects in &lt;backupDir&gt; will be (unavoidably) removed to avoid
 misleading situations in that for a symbolic link in &lt;sourceDir&gt; that points
-to an object, &lt;backupDir&gt; would contain a different object. The only exception
-is when the objects in &lt;backupDir&gt; are symbolic links as well, in which case
-they will be kept (but not changed). Please see section Following Symbolic Links
-on when symbolic links are not reported as symbolic links by FIND.
+to an object, &lt;backupDir&gt; would contain a different object under same path.
+The only exception is when the objects in &lt;backupDir&gt; are symbolic links too,
+in which case they will be kept (but not changed). Please see section
+Following Symbolic Links on when symbolic links are not reported as
+symbolic links by FIND.
 
 Corner case objects in &lt;backupDir&gt; under same paths as other objects (p/s/c/b/D)
 in &lt;sourceDir&gt;: The objects in &lt;backupDir&gt; will be (unavoidably) removed except
-when they are other objects (p/s/c/b/D) as well, in which case they will be kept
+when they are other objects (p/s/c/b/D) too, in which case they will be kept
 (but not changed).
 
 Corner case if directory .Zaloha_metadata exists under &lt;sourceDir&gt; as well
@@ -1034,6 +1037,10 @@ Zaloha will perform hardlink detection on &lt;sourceDir&gt; and for the detected
 hardlinks (h) it prepares removals of the corresponding files in &lt;backupDir&gt;,
 which is the same directory. The hardlinks can be restored by restore script
 830_restore_hardlinks.sh.
+
+It is possible (but not recommended) for &lt;backupDir&gt; to be a subdirectory of
+&lt;sourceDir&gt; and vice versa. In such cases, FIND expressions to avoid recursive
+copying must be passed in via &lt;findGeneralOps&gt;.
 </pre>
 
 
@@ -1095,7 +1102,7 @@ this results in ( 5 x 4 ) + 5 + 4 = 29 cases to be handled by AWKDIFF:
   ---------------------------------------------------------------------------
 
   Note 1: Hardlinks (h) cannot occur in &lt;backupDir&gt;, because the type "h" is not
-  returned by FIND but determined by AWKHLINKS that can operate only on
+  reported by FIND but determined by AWKHLINKS that can operate only on
   &lt;sourceDir&gt;.
 
   Note 2: Please see section Following Symbolic Links on when symbolic links
@@ -1134,8 +1141,8 @@ column 13 alone.
 
 The combined primary key in file 505 is obvious e.g. in the case of other object
 in &lt;sourceDir&gt; and other object in &lt;backupDir&gt;: File 505 then contains an
-<b>OK</b> record for the former and a <b>KEEP</b> record for the latter, both with the same
-file's path (column 13).
+<b>OK</b> record for the former and a <b>KEEP</b> record for the latter, both with the
+same file's path (column 13).
 </pre>
 
 
@@ -1190,14 +1197,14 @@ and &lt;findGeneralOps&gt;, which may contain the ///d/ placeholder.
 In the shellscripts produced by Zaloha, single quoting is used, hence single
 quotes are disruptors. As a solution, the '"'"' quoting technique is used.
 
-The SORT commands are run under the LC_ALL=C environment variable, to avoid
+The SORT commands are invoked under the LC_ALL=C environment variable, to avoid
 problems caused by some locales that ignore slashes and other punctuations
 during sorting.
 
 In the CSV metadata files 330 through 500 (i.e. those which undergo the sorts),
 file's paths (field 13) have directory separators (/) appended and all
 directory separators then converted to ///s. This is to ensure correct sort
-ordering. Imagine the ordering bugs which would happen otherwise:
+ordering. Imagine the ordering bugs that would happen otherwise:
   Case 1: given dir and dir!, they would be sort ordered:
           dir, dir!, dir!/subdir, dir/subdir.
   Case 2: given dir and dir&lt;tab&gt;ectory, they would be sort ordered:
@@ -1233,8 +1240,8 @@ Zaloha to not run FIND on &lt;sourceDir&gt; and/or &lt;backupDir&gt;, but use ex
 supplied CSV metadata files 310 and/or 320 instead. This means that these files
 must be produced by the wrapper script (e.g. by running FIND commands in an SSH
 session) and downloaded to the Zaloha metadata directory before invoking Zaloha.
-These files must, of course, have the same names and formats as the CSV metadata
-files that would otherwise be produced by the scripts 210 and/or 220.
+These files must, of course, have the same names and contents as the CSV
+metadata files that would otherwise be produced by the scripts 210 and/or 220.
 
 The <b>--noFindSource</b> and/or <b>--noFindBackup</b> options are also useful when
 network-mounted directories are available locally, but running FIND on them is
@@ -1293,7 +1300,7 @@ options, also Zaloha prepares the 620 script without header (i.e. body only).
 The wrapper script should prepare the 1+8 different headers and use them
 with the header-less 620 script.
 
-Exec1 and Exec4: use the same recipe, except that the one script which removes
+Exec1 and Exec4: use the same recipe, except that the script which removes
 the directories must run last, of course, not first.
 </pre>
 
@@ -1316,11 +1323,63 @@ ALTERNATIVE 2: overload the file size field (CSV column 4) with SHA-256 hash
 
 The idea is: Zaloha does not compare file sizes numerically, but as strings.
 Also, appending semicolon (";") and the SHA-256 hash to the file size field
-achieves exactly what is needed: If the file size is identical but the SHA-256
-hash differs, Zaloha will detect that the file needs synchronization.
+achieves exactly what is needed: If the file sizes are identical but the SHA-256
+hashes differ, Zaloha will detect that the files need synchronization.
 
 There is an almost 100% security that files are identical if they have equal
 sizes and SHA-256 hashes. An implementation requires use of the <b>--noFindSource</b>
 and <b>--noFindBackup</b> options with own mechanism of (local or remote) preparation
 of CSV metadata files 310 and 320 with column 4 overloaded as described.
+</pre>
+
+
+### CYBER SECURITY TOPICS
+
+<pre>
+Standard security practices should be followed on environments exposed to
+potential attackers: Potential attackers should not be allowed to modify the
+command line that invokes Zaloha, the PATH variable, bash init scripts or other
+items that may influence how Zaloha works and invokes operating system commands.
+
+Further, the following security threats arise from backup of a directory that is
+writable by a potential attacker:
+
+Backup media overflow attack via hardlinks
+------------------------------------------
+The attacker might create a huge file in his home directory and hardlink it
+many thousands times, hoping that the backup program writes all copies to
+the backup media ...
+
+Mitigation with Zaloha: perform hardlink detection (use the <b>--hLinks</b> option)
+
+Backup media overflow attack via symbolic links
+-----------------------------------------------
+The attacker might create many symbolic links pointing to directories with huge
+contents outside of his home directory, hoping that the backup program writes
+all linked contents to the backup media ...
+
+Mitigation with Zaloha: do not follow symbolic links on &lt;sourceDir&gt; (do not use
+                        the <b>--followSLinksS</b> option)
+
+Privilege escalation attacks
+----------------------------
+The attacker might create a rogue executable program in his home directory with
+the SetUID and/or SetGID bits set, hoping that within the backup process (or
+within the restore process, which he might explicitly request for this purpose),
+the user/group ownership of his rogue program changes to a user/group with
+higher privileges (ideally root), the SetUID and/or SetGID bits will be restored
+and he will have access to this program ...
+
+Mitigation with Zaloha: Prevent this scenario. Be specially careful with options
+                        <b>--pMode</b> and <b>--pRevMode</b> and with the restore script
+                        860_restore_mode.sh
+
+Shell code injection attacks
+----------------------------
+The attacker might create a file in his home directory with a name that is
+actually a rogue shell code (e.g. '; rm -Rf ..'), hoping that the shell code
+will, due to some program flaw, be executed by a user with higher privileges.
+
+Mitigation with Zaloha: currently not aware of such vulnerability within Zaloha.
+                        If found, please open a high priority issue on GitHub.
 </pre>
