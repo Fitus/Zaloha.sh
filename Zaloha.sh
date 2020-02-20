@@ -1667,7 +1667,7 @@ do
     --mawk)              opt_dupli_check ${mawk} "${tmpVal}";           mawk=1 ;;
     --lTest)             opt_dupli_check ${lTest} "${tmpVal}";          lTest=1 ;;
     --help)              opt_dupli_check ${help} "${tmpVal}";           help=1 ;;
-    *) error_exit "Unknown option ${tmpVal}, get help via Zaloha.sh --help" ;;
+    *) error_exit "Unknown option ${tmpVal//${CNTRLPATTERN}/${TRIPLETC}}, get help via Zaloha.sh --help" ;;
   esac
 done
 
@@ -1990,6 +1990,7 @@ BEGIN {
         "      sub( /^.*\\//, \"\", error_exit_filename )\n"                \
         "      msg = \"(\" error_exit_filename \" FNR:\" FNR \") \" msg\n"  \
         "    }\n"                                                           \
+        "    gsub( CNTRLREGEX, TRIPLETC, msg )\n"                           \
         "    print \"\\nZaloha AWK: \" msg > \"/dev/stderr\"\n"             \
         "    close( \"/dev/stderr\" )\n"                                    \
         "    exit 1\n"                                                      \
@@ -1997,6 +1998,7 @@ BEGIN {
         "}"
   war = "function warning( msg ) {\n"                                       \
         "  if ( \"\" == error_exit_filename ) {\n"                          \
+        "    gsub( CNTRLREGEX, TRIPLETC, msg )\n"                           \
         "    print \"\\nZaloha AWK: Warning: \" msg > \"/dev/stderr\"\n"    \
         "    close( \"/dev/stderr\" )\n"                                    \
         "  }\n"                                                             \
@@ -2282,7 +2284,7 @@ BEGIN {
   FS = FSTAB   # FSTAB or TAB, because fields are separated both by tabs produced by FIND as well as by tabs contained in filenames
   OFS = FSTAB
   fin = 1      # field index in output record
-  fpr = 0      # flag field in progress
+  fpr = 0      # flag field in progress (for fin 13 or 15)
   fne = 0      # flag field not empty
   rec = ""     # output record
 }
@@ -2290,52 +2292,52 @@ function add_fragment_to_field( fragment, verbatim ) {
   if ( "" != fragment ) {
     fne = 1
   }
-  if (( 13 == fin ) && ( 0 == verbatim )) {             # in field 13, convert slashes to TRIPLETS's
+  if (( 13 == fin ) && ( 0 == verbatim )) {             #  (in field 13, convert slashes to TRIPLETS's)
     gsub( SLASHREGEX, TRIPLETS, fragment )
   }
   rec = rec fragment
 }
 {
-  if (( 1 == fin ) && ( 16 == NF ) && ( TRIPLET == $1 ) && ( TRIPLET == $16 )) {   ## the unproblematic case performance-optimized
+  if (( 1 == fin ) && ( 16 == NF ) && ( TRIPLET == $1 ) && ( TRIPLET == $16 )) {   #### the unproblematic case performance-optimized
     if ( "" != $13 ) {
-      $13 = $13 SLASH                                   # if field 13 is not empty, append slash and convert slashes to TRIPLETS's
+      $13 = $13 SLASH                                   #  (if field 13 is not empty, append slash and convert slashes to TRIPLETS's)
       gsub( SLASHREGEX, TRIPLETS, $13 )
     }
     print
-  } else {                                                                         ## full processing otherwise
-    if ( 0 == NF ) {
-      if ( 1 == fpr ) {
+  } else {                                                                         #### full processing otherwise
+    if ( 0 == NF ) {                                    ### blank input line
+      if ( 1 == fpr ) {                                 ## blank input line while fin 13 or 15 in progress (= newline in file name)
         add_fragment_to_field( TRIPLETN, 1 )
-      } else {
+      } else {                                          ## blank input line otherwise
         error_exit( "Unexpected blank line in raw output of FIND" )
       }
-    } else {
+    } else {                                            ### non-blank input line
+      if (( TRIPLET == $1 ) && (( 1 != fin ) || ( 0 != fpr ))) {
+        error_exit( "AWK cleaner in unexpected state at begin of new record" )
+      }
       for ( i = 1; i <= NF; i++ ) {
-        if (( 1 == i ) && ( TRIPLET == $i ) && (( 1 != fin ) || ( 0 != fpr ))) {
-          error_exit( "AWK cleaner in unexpected state at begin of new record" )
-        }
-        if ( 1 == fpr ) {
-          if ( TRIPLET == $i ) {
-            if (( 13 == fin ) && ( 1 == fne )) {        # append TRIPLETS to field 13 (if field 13 is not empty)
+        if ( 1 == fpr ) {                               ## fin 13 or 15 in progress
+          if ( TRIPLET == $i ) {                        # TRIPLET terminator found
+            if (( 13 == fin ) && ( 1 == fne )) {        #  (append TRIPLETS to field 13 (if field 13 is not empty))
               add_fragment_to_field( TRIPLETS, 1 )
             }
             rec = rec FSTAB TRIPLET
             fin = fin + 2
             fpr = 0
             fne = 0
-          } else if ( 1 == i ) {
+          } else if ( 1 == i ) {                        # fin 13 or 15 in progress continues on next line (= newline in file name)
             add_fragment_to_field( TRIPLETN, 1 )
             add_fragment_to_field( $i, 0 )
-          } else {
+          } else {                                      # fin 13 or 15 in progress continues in next field (= tab in file name)
             add_fragment_to_field( TRIPLETT, 1 )
             add_fragment_to_field( $i, 0 )
           }
-        } else {
+        } else {                                        ## normal case (= fin 13 or 15 not in progress)
           if ( 1 == fin ) {                             # field 1 starts a record
             add_fragment_to_field( $i, 0 )
             fin = 2
             fne = 0
-          } else if (( 13 == fin ) || ( 15 == fin )) {  # fields 13 and 15 are delimited by subsequent terminator fields
+          } else if (( 13 == fin ) || ( 15 == fin )) {  # fields 13 and 15 are terminator-delimited: start progress
             rec = rec FSTAB
             add_fragment_to_field( $i, 0 )
             fpr = 1
@@ -2346,12 +2348,15 @@ function add_fragment_to_field( fragment, verbatim ) {
             fne = 0
           }
         }
-        if (( NF == i ) && ( TRIPLET == $i ) && (( 17 != fin ) || ( 0 != fpr ))) {
-          error_exit( "AWK cleaner in unexpected state at end of record" )
-        }
+      }
+      if (( TRIPLET == $NF ) && (( 17 != fin ) || ( 0 != fpr ))) {
+        error_exit( "AWK cleaner in unexpected state at end of record" )
+      }
+      if ( 17 < fin ) {
+        error_exit( "AWK cleaner in unexpected state at end of input line" )
       }
     }
-    if ( 17 == fin ) {                                  # 17 = field index of last field + 1
+    if ( 17 == fin ) {                                  ### output record is complete (17 = index of last field + 1)
       print rec
       rec = ""
       fin = 1
@@ -2382,6 +2387,8 @@ ${awk} -f "${f100}" << 'AWKCHECKER' > "${f130}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
+  ldp = 0    # 3x directory depth of last record
+  ltp = ""   # file's type of last record
 }
 {
   if ( 16 != NF ) {
@@ -2441,6 +2448,18 @@ BEGIN {
   if ( $16 != TRIPLET ) {
     error_exit( "Unexpected, column 16 of cleaned file is not terminator field" )
   }
+  pt = $13
+  gsub( TRIPLETSREGEX, SLASH, pt )
+  cdp = length( $13 ) - length( pt )  # 3x directory depth of current record
+  if ( cdp > ldp + 3 ) {
+    pt = substr( pt, 1, length( pt ) - 1 )
+    error_exit( "Unexpected: directory level(s) skipped before: " pt )
+  } else if (( cdp > ldp ) && ( "d" != ltp )) {
+    pt = substr( pt, 1, length( pt ) - 1 )
+    error_exit( "Unexpected: Parent of this object is not a directory: " pt )
+  }
+  ldp = cdp
+  ltp = $3
 }
 AWKCHECKER
 
@@ -2879,19 +2898,22 @@ BEGIN {
 }
 {
   if ( $2 ~ /^REV\.NEW/ ) {
-    lrn = $13             # remember path of last file to REV.NEW
+    lrn = $13                # remember path of last file to REV.NEW
   } else if ( $2 ~ /^KEEP/ ) {
     if (( "d" == $3 ) && ( 1 == index( lrn, $13 ))) {
-      $2 = "REV.MKDI"     # convert KEEP to REV.MKDI on parent directory of a file to REV.NEW
+      $2 = "REV.MKDI"        # convert KEEP to REV.MKDI on parent directory of a file to REV.NEW
     } else {
-      lkp = $13           # remember path of last object to KEEP only in <backupDir>
+      lkp = $13              # remember path of last object to KEEP only in <backupDir>
     }
   } else if ( $2 ~ /^RMDIR/ ) {
     if ( 1 == index( lrn, $13 )) {
-      $2 = "REV.MKDI"     # convert RMDIR to REV.MKDI on parent directory of a file to REV.NEW
+      $2 = "REV.MKDI"        # convert RMDIR to REV.MKDI on parent directory of a file to REV.NEW
     } else if ( 1 == index( lkp, $13 )) {
-      $2 = "KEEP"         # convert RMDIR to KEEP on parent directory of an object to KEEP only in <backupDir>
+      $2 = "KEEP"            # convert RMDIR to KEEP on parent directory of an object to KEEP only in <backupDir>
     }
+  } else if ( "d" == $3 ) {  # encountered a directory with neither KEEP nor RMDIR: safe to forget lrn and lkp
+    lrn = ""
+    lkp = ""
   }
   # modifications done, split off 510 and 540 data, output remaining data
   if ( $2 ~ /^(uRMDIR|uREMOVE)/ ) {
