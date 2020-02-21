@@ -1,9 +1,9 @@
 # Zaloha.sh
 
-Zaloha is a shellscript for synchronization of files and directories. It is a much simpler alternative to RSYNC, with key differences:
+Zaloha is a small and simple directory synchronizer:
 
- * Zaloha is a bash shellscript that uses only FIND, SORT and AWK.
- * All you need is the Zaloha.sh file (contains ~74 kB of program code and ~76 kB of documentation).
+ * Zaloha is a BASH script that uses only FIND, SORT and AWK.
+ * All you need is the Zaloha.sh file (contains ~76 kB of program code and ~76 kB of documentation).
  * No compilation, installation and configuration is required.
  * Cyber-secure: No new binary code, no new open ports, easily reviewable.
  * Both directories must be available locally (local HDD/SSD, flash drive, mounted Samba or NFS volume).
@@ -46,9 +46,9 @@ Measured performance of the analysis phase:
 Performance of the execution phase:
  * depends on how many files need synchronization: zero to several minutes
 
-## Add-on shellscript Zaloha_Snapshot.sh
+## Add-on script Zaloha_Snapshot.sh
 
-An add-on shellscript to create hardlink-based snapshots of the backup directory exists: [Zaloha_Snapshot](https://github.com/Fitus/Zaloha_Snapshot.sh).
+An add-on script to create hardlink-based snapshots of the backup directory exists: [Zaloha_Snapshot](https://github.com/Fitus/Zaloha_Snapshot.sh).
 This allows to create **Time Machine**-like backup solutions.
 
 ## License
