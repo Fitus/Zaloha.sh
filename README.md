@@ -17,6 +17,17 @@ Full documentation is available both [online](DOCUMENTATION.md) as well as insid
 
 On Linux/Unics, Zaloha runs natively. On Windows, Cygwin is needed.
 
+## What are synchronization programs good for ?
+
+[Read article here](https://fitus.github.io/).
+
+## Obtain Zaloha.sh
+
+The simplest way: Under the green button "<b>Clone or Download</b>" above, choose "<b>Download ZIP</b>".
+From the downloaded ZIP archive, extract Zaloha.sh and make it executable (<b>chmod u+x Zaloha.sh</b>).
+
+For running the Simple Demo, extract also the scripts Simple_Demo_step1/2/3/4/5/6/7.sh and make them executable.
+
 ## Usage Example
 
 ```bash
