@@ -21,6 +21,14 @@ On Linux/Unics, Zaloha runs natively. On Windows, Cygwin is needed.
 
 [Read article here](https://fitus.github.io/).
 
+## How does Zaloha.sh work - in five sentences
+
+ * FIND is executed to scan both directories to obtain metadata about files and subdirectories.
+ * The metadata is compared via several stages of sorting and AWK processing.
+ * The results (= prepared synchronization actions) are presented to the user for confirmation.
+ * If the user confirms, the synchronization actions are executed.
+ * A non-interactive regime is available as well.
+
 ## Obtain Zaloha.sh
 
 The simplest way: Under the green button "<b>Clone or Download</b>" above, choose "<b>Download ZIP</b>".
