@@ -226,6 +226,10 @@ given, symbolic links on <sourceDir> are followed and the referenced files and
 directories are synchronized to <backupDir>. See section Following Symbolic
 Links for details.
 
+  Note: Zaloha is unable to process symbolic links which have not normalized
+  target paths with three or more consecutive slashes (for details, see section
+  on Handling of Weird Characters in Filenames further below).
+
 Zaloha does not synchronize other types of objects in <sourceDir> (named pipes,
 sockets, special devices, etc). These objects are considered to be part of the
 operating system or parts of applications, and dedicated scripts for their
@@ -1089,7 +1093,7 @@ evaluates this situation: The type of the first link will be kept as "file" (f),
 the types of the other links will be changed to "hardlinks" (h).
 
 Then comes the core function of Zaloha. The CSV metadata files from <sourceDir>
-and <backupDir> will be united and sorted by filename and the Source/Backup
+and <backupDir> will be united and sorted by file path and the Source/Backup
 indicator. This means that objects existing in both directories will be in
 adjacent records, with the <backupDir> record coming first. The AWK program
 AWKDIFF evaluates this situation (as well as records from objects existing in
@@ -1170,7 +1174,7 @@ TECHNIQUES USED BY ZALOHA TO HANDLE WEIRD CHARACTERS IN FILENAMES
 
 Handling of "weird" characters in filenames was a special focus during
 development of Zaloha. Actually, it was an exercise of how far can be gone with
-shellscript alone, without reverting to a C program. Tested were:
+a shellscript alone, without reverting to a C program. Tested were:
 !"#$%&'()*+,-.:;<=>?@[\]^`{|}~, spaces, tabs, newlines, alert (bell) and
 a few national characters (beyond ASCII 127). Please note that some filesystem
 types and operating systems do not permit some of these weird characters at all.
@@ -1212,6 +1216,16 @@ back to backslashes in the AWK programs.
 Zaloha checks that no input parameters contain ///, to avoid breaking of the
 internal escape logic from the outside. The only exception are <findSourceOps>
 and <findGeneralOps>, which may contain the ///d/ placeholder.
+
+Additionally, the internal escape logic might be broken by target paths of
+symbolic links: Unfortunately, the OSes do not normalize target paths with
+consecutive slashes while writing them to the filesystems, and FIND does not
+normalize them either in the -printf %l output. Actually, there seem to be no
+constraints on the target paths of symbolic links. Hence, the /// triplets can
+occur there as well. The solution is the exclusion of such symbolic links from
+the processing, by the FIND expressions -lname *///* -o. Yes, honestly, here we
+hit a limit of how far can be reasonably gone with a shellscript alone. Whether
+such symbolic links are relevant to day-to-day practice is debatable, however.
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single
 quotes are disruptors. As a solution, the '"'"' quoting technique is used.
@@ -1372,6 +1386,15 @@ Backup media overflow attack via symbolic links
 The attacker might create many symbolic links pointing to directories with huge
 contents outside of his home directory, hoping that the backup program writes
 all linked contents to the backup media ...
+
+Mitigation with Zaloha: do not follow symbolic links on <sourceDir> (do not use
+                        the "--followSLinksS" option)
+
+Unauthorized access via symbolic links
+--------------------------------------
+The attacker might create symbolic links to locations to which he has no access,
+hoping that within the restore process (which he might explicitly request for
+this purpose) the linked content will be restored to his home directory ...
 
 Mitigation with Zaloha: do not follow symbolic links on <sourceDir> (do not use
                         the "--followSLinksS" option)
@@ -1824,9 +1847,9 @@ metaDirEsc="${metaDir//${TAB}/${TRIPLETT}}"
 metaDirEsc="${metaDirEsc//${NLINE}/${TRIPLETN}}"
 
 ###########################################################
-findLastRunOpsFinalAwk="-path ${TRIPLETDSEP}${f999Base}"
-findSourceOpsFinalAwk="${findGeneralOpsAwk} ${findSourceOpsAwk}"
-findBackupOpsFinalAwk="${findGeneralOpsAwk}"
+findLastRunOpsFinalAwk="-path ${TRIPLETDSEP}${f999Base} -type f"
+findSourceOpsFinalAwk="${findGeneralOpsAwk} ${findSourceOpsAwk} -lname ${ASTERISK}${TRIPLET}${ASTERISK} -o"
+findBackupOpsFinalAwk="${findGeneralOpsAwk} -lname ${ASTERISK}${TRIPLET}${ASTERISK} -o"
 
 if [ ${metaDirPassed} -eq 0 ]; then
   findSourceOpsFinalAwk="-path ${TRIPLETDSEP}${metaDirDefaultBase} -prune -o ${findSourceOpsFinalAwk}"
@@ -2708,9 +2731,6 @@ function process_previous_record() {
   if ( "L" == $2 ) {
     if ( 1 != NR ) {
       error_exit( "Unexpected, misplaced L record" )
-    }
-    if ( "f" != $3 ) {
-      error_exit( "Unexpected, L record is not a file" )
     }
     lru = $5
   } else {

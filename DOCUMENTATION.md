@@ -199,6 +199,10 @@ given, symbolic links on &lt;sourceDir&gt; are followed and the referenced files
 directories are synchronized to &lt;backupDir&gt;. See section Following Symbolic
 Links for details.
 
+  Note: Zaloha is unable to process symbolic links which have not normalized
+  target paths with three or more consecutive slashes (for details, see section
+  on Handling of Weird Characters in Filenames further below).
+
 Zaloha does not synchronize other types of objects in &lt;sourceDir&gt; (named pipes,
 sockets, special devices, etc). These objects are considered to be part of the
 operating system or parts of applications, and dedicated scripts for their
@@ -1068,7 +1072,7 @@ evaluates this situation: The type of the first link will be kept as "file" (f),
 the types of the other links will be changed to "hardlinks" (h).
 
 Then comes the core function of Zaloha. The CSV metadata files from &lt;sourceDir&gt;
-and &lt;backupDir&gt; will be united and sorted by filename and the Source/Backup
+and &lt;backupDir&gt; will be united and sorted by file path and the Source/Backup
 indicator. This means that objects existing in both directories will be in
 adjacent records, with the &lt;backupDir&gt; record coming first. The AWK program
 AWKDIFF evaluates this situation (as well as records from objects existing in
@@ -1150,7 +1154,7 @@ same file's path (column 13).
 <pre>
 Handling of "weird" characters in filenames was a special focus during
 development of Zaloha. Actually, it was an exercise of how far can be gone with
-shellscript alone, without reverting to a C program. Tested were:
+a shellscript alone, without reverting to a C program. Tested were:
 !"#$%&amp;'()*+,-.:;&lt;=&gt;?@[\]^`{|}~, spaces, tabs, newlines, alert (bell) and
 a few national characters (beyond ASCII 127). Please note that some filesystem
 types and operating systems do not permit some of these weird characters at all.
@@ -1192,6 +1196,16 @@ back to backslashes in the AWK programs.
 Zaloha checks that no input parameters contain ///, to avoid breaking of the
 internal escape logic from the outside. The only exception are &lt;findSourceOps&gt;
 and &lt;findGeneralOps&gt;, which may contain the ///d/ placeholder.
+
+Additionally, the internal escape logic might be broken by target paths of
+symbolic links: Unfortunately, the OSes do not normalize target paths with
+consecutive slashes while writing them to the filesystems, and FIND does not
+normalize them either in the -printf %l output. Actually, there seem to be no
+constraints on the target paths of symbolic links. Hence, the /// triplets can
+occur there as well. The solution is the exclusion of such symbolic links from
+the processing, by the FIND expressions -lname *///* -o. Yes, honestly, here we
+hit a limit of how far can be reasonably gone with a shellscript alone. Whether
+such symbolic links are relevant to day-to-day practice is debatable, however.
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single
 quotes are disruptors. As a solution, the '"'"' quoting technique is used.
@@ -1356,6 +1370,15 @@ Backup media overflow attack via symbolic links
 The attacker might create many symbolic links pointing to directories with huge
 contents outside of his home directory, hoping that the backup program writes
 all linked contents to the backup media ...
+
+Mitigation with Zaloha: do not follow symbolic links on &lt;sourceDir&gt; (do not use
+                        the <b>--followSLinksS</b> option)
+
+Unauthorized access via symbolic links
+--------------------------------------
+The attacker might create symbolic links to locations to which he has no access,
+hoping that within the restore process (which he might explicitly request for
+this purpose) the linked content will be restored to his home directory ...
 
 Mitigation with Zaloha: do not follow symbolic links on &lt;sourceDir&gt; (do not use
                         the <b>--followSLinksS</b> option)
