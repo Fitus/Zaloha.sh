@@ -2409,8 +2409,8 @@ ${awk} -f "${f100}" << 'AWKCHECKER' > "${f130}"
 DEFINE_ERROR_EXIT
 BEGIN {
   FS = FSTAB
-  ldp = 0    # 3x directory depth of last record
-  ltp = ""   # file's type of last record
+  ldp = -3    # 3x directory depth of last record
+  ltp = "d"   # file's type of last record
 }
 {
   if ( 16 != NF ) {
@@ -2465,29 +2465,35 @@ BEGIN {
     error_exit( "Unexpected, column 15 of cleaned file is empty for symbolic link" )
   }
   if (( $15 != "" ) && ( "l" != $3 )) {
-    error_exit( "Unexpected, column 15 of cleaned file is not empty" )
+    error_exit( "Unexpected, column 15 of cleaned file is not empty for other object than symbolic link" )
   }
   if ( $16 != TRIPLET ) {
     error_exit( "Unexpected, column 16 of cleaned file is not terminator field" )
   }
-  pt = $13
-  gsub( TRIPLETSREGEX, SLASH, pt )
-  cdp = length( $13 ) - length( pt )  # 3x directory depth of current record
-  if ( cdp > ldp + 3 ) {
-    pt = substr( pt, 1, length( pt ) - 1 )
-    error_exit( "Unexpected: directory level(s) skipped before: " pt )
-  } else if (( cdp > ldp ) && ( "d" != ltp )) {
-    pt = substr( pt, 1, length( pt ) - 1 )
-    error_exit( "Unexpected: Parent of this object is not a directory: " pt )
+  if ( 1 == checkDirs ) {
+    pt = $13
+    gsub( TRIPLETSREGEX, SLASH, pt )
+    cdp = length( $13 ) - length( pt )  # 3x directory depth of current record
+    if ( cdp > ldp + 3 ) {
+      pt = substr( pt, 1, length( pt ) - 1 )
+      error_exit( "Unexpected: directory level(s) skipped before: " pt )
+    } else if (( cdp > ldp ) && ( "d" != ltp )) {
+      pt = substr( pt, 1, length( pt ) - 1 )
+      error_exit( "Unexpected: Parent of this object is not a directory: " pt )
+    }
+    ldp = cdp
+    ltp = $3
   }
-  ldp = cdp
-  ltp = $3
 }
 AWKCHECKER
 
 start_progress "Checking"
 
-${awk} -f "${f130}" "${fLastRun}" "${f330}" "${f340}"
+${awk} -f "${f130}" -v checkDirs=0 "${fLastRun}"
+
+${awk} -f "${f130}" -v checkDirs=1 "${f330}"
+
+${awk} -f "${f130}" -v checkDirs=1 "${f340}"
 
 stop_progress
 
