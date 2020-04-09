@@ -3,7 +3,7 @@
 Zaloha is a small and simple directory synchronizer:
 
  * Zaloha is a BASH script that uses only FIND, SORT and AWK.
- * All you need is the Zaloha.sh file (contains ~76 kB of program code and ~76 kB of documentation).
+ * All you need is the Zaloha.sh file (contains ~76 kB of program code and ~78 kB of documentation).
  * No compilation, installation and configuration is required.
  * Cyber-secure: No new binary code, no new open ports, easily reviewable.
  * Both directories must be available locally (local HDD/SSD, flash drive, mounted Samba or NFS volume).
@@ -28,6 +28,9 @@ On Linux/Unics, Zaloha runs natively. On Windows, Cygwin is needed.
  * The results (= prepared synchronization actions) are presented to the user for confirmation.
  * If the user confirms, the synchronization actions are executed.
  * A non-interactive regime is available as well.
+
+Are you interested in knowing more? Then see this [interactive JavaScript flowchart](https://fitus.github.io/flowchart.html)
+and read the relevant sections in the [documentation](DOCUMENTATION.md).
 
 ## Obtain Zaloha.sh
 
@@ -68,7 +71,7 @@ Performance of the execution phase:
 ## Add-on script Zaloha_Snapshot.sh
 
 An add-on script to create hardlink-based snapshots of the backup directory exists: [Zaloha_Snapshot](https://github.com/Fitus/Zaloha_Snapshot.sh).
-This allows to create **Time Machine**-like backup solutions.
+This allows to create **Time&nbsp;Machine**-like backup solutions.
 
 ## License
 MIT License

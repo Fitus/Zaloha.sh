@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 echo "PREPARING TEST DIRECTORIES 'test_source' AND 'test_backup'"
 
 # prepare source directory with some test files

@@ -651,7 +651,7 @@ Further, the internal logic of Zaloha imposes the following limitations:
 
  * Exclusion of files by the "--findGeneralOps" option: As <findGeneralOps>
    applies to both <sourceDir> and <backupDir>, and the objects in both
-   directories are "matched" by file paths, only expressions with -path or
+   directories are "matched" by file's paths, only expressions with -path or
    -name operands make sense. Why? If objects exist under same paths in both
    directories, Zaloha should either see both of them or none of them.
    Both -path and -name expressions assure this, but not necessarily the
@@ -1087,14 +1087,14 @@ The cleaned CSV metadata files are then checked by AWKCHECKER for unexpected
 deviations (in which case an error is thrown and the processing stops).
 
 The next (optional) step is to detect hardlinks: the CSV metadata file from
-<sourceDir> will be sorted by device number + inode number. This means that
+<sourceDir> will be sorted by device numbers + inode numbers. This means that
 multiply-linked files will be in adjacent records. The AWK program AWKHLINKS
 evaluates this situation: The type of the first link will be kept as "file" (f),
 the types of the other links will be changed to "hardlinks" (h).
 
 Then comes the core function of Zaloha. The CSV metadata files from <sourceDir>
-and <backupDir> will be united and sorted by file path and the Source/Backup
-indicator. This means that objects existing in both directories will be in
+and <backupDir> will be united and sorted by file's paths and the Source/Backup
+indicators. This means that objects existing in both directories will be in
 adjacent records, with the <backupDir> record coming first. The AWK program
 AWKDIFF evaluates this situation (as well as records from objects existing in
 only one of the directories), and writes target state of synchronized
@@ -1107,6 +1107,11 @@ objects to KEEP only in <backupDir>.
 
 The remaining code uses the produced data to perform actual work, and should be
 self-explanatory.
+
+An interactive JavaScript flowchart exists that explains the internal processing
+within Zaloha in a graphical and intuitive manner.
+
+  Interactive JavaScript flowchart: https://fitus.github.io/flowchart.html
 
 Understanding AWKDIFF is the key to understanding of whole Zaloha. An important
 hint to AWKDIFF is that there can be five types of filesystem objects in
@@ -1208,10 +1213,13 @@ to determine where the filenames end in a situation when they contain tabs and
 newlines (it is impossible that filenames produce a field containing /// alone,
 because filenames cannot contain the tab + /// sequence).
 
-An additional challenge is passing of variable values to AWK. During its
-lexical parsing, AWK interprets backslash-led escape sequences. To avoid this,
-backslashes are converted to ///b in the bash script, and ///b are converted
-back to backslashes in the AWK programs.
+With these preparations, see how the AWKCLEANER works: For columns 13 and 15,
+process CSV fields and records until a field containing /// is found. In such
+special processing mode (in AWK code: fpr has value 1), every switch to a new
+CSV field is a tab in the path, and every switch to a new record is a newline
+in the path. AWKCLEANER assembles the fragments contained in the CSV fields
+with the tabs (escaped as ///t) and newlines (escaped as ///n) to build the
+resulting escaped paths that contain neither real tabs nor real newlines.
 
 Zaloha checks that no input parameters contain ///, to avoid breaking of the
 internal escape logic from the outside. The only exception are <findSourceOps>
@@ -1226,6 +1234,11 @@ occur there as well. The solution is the exclusion of such symbolic links from
 the processing, by the FIND expressions -lname *///* -o. Yes, honestly, here we
 hit a limit of how far can be reasonably gone with a shellscript alone. Whether
 such symbolic links are relevant to day-to-day practice is debatable, however.
+
+An additional challenge is passing of variable values to AWK. During its
+lexical parsing, AWK interprets backslash-led escape sequences. To avoid this,
+backslashes are converted to ///b in the bash script, and ///b are converted
+back to backslashes in the AWK programs.
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single
 quotes are disruptors. As a solution, the '"'"' quoting technique is used.
@@ -2204,7 +2217,7 @@ BEGIN {
   cmd = cmd "\\t%m"             # column 12: file's permission bits (in octal)
   cmd = cmd "\\t%P"             # column 13: file's path with <sourceDir> or <backupDir> stripped
   cmd = cmd "\\t" TRIPLET       # column 14: terminator field
-  cmd = cmd "\\t%l"             # column 15: object of symbolic link
+  cmd = cmd "\\t%l"             # column 15: target path of symbolic link [path of first link (the "file") for a hardlink]
   cmd = cmd "\\t" TRIPLET       # column 16: terminator field
   cmd = cmd "\\n' > '" outFile "'"
   BIN_BASH
@@ -2534,8 +2547,8 @@ BEGIN {
     if ( md != $12 ) {
       error_exit( "Unexpected falsely detected hardlink (mode differs)" )
     }
-    $3 = "h"    # hardlink
-    $15 = pt    # object of hardlink
+    $3 = "h"    # file's type is set to hardlink
+    $15 = pt    # path of first link (the "file") goes to column 15
     if ( "" != $15 ) {
       gsub( TRIPLETSREGEX, SLASH, $15 )
       $15 = substr( $15, 1, length( $15 ) - 1 )
@@ -2847,7 +2860,7 @@ function process_previous_record() {
   gr = $11    # previous record's column 11: file's group name
   md = $12    # previous record's column 12: file's permission bits (in octal)
   pt = $13    # previous record's column 13: file's path with <sourceDir> or <backupDir> stripped
-  ol = $15    # previous record's column 15: object of symbolic link
+  ol = $15    # previous record's column 15: target path of symbolic link [path of first link (the "file") for a hardlink]
 }
 END {
   if ( 1 == prr ) {

@@ -626,7 +626,7 @@ Further, the internal logic of Zaloha imposes the following limitations:
 
  * Exclusion of files by the <b>--findGeneralOps</b> option: As &lt;findGeneralOps&gt;
    applies to both &lt;sourceDir&gt; and &lt;backupDir&gt;, and the objects in both
-   directories are "matched" by file paths, only expressions with -path or
+   directories are "matched" by file's paths, only expressions with -path or
    -name operands make sense. Why? If objects exist under same paths in both
    directories, Zaloha should either see both of them or none of them.
    Both -path and -name expressions assure this, but not necessarily the
@@ -1066,14 +1066,14 @@ The cleaned CSV metadata files are then checked by AWKCHECKER for unexpected
 deviations (in which case an error is thrown and the processing stops).
 
 The next (optional) step is to detect hardlinks: the CSV metadata file from
-&lt;sourceDir&gt; will be sorted by device number + inode number. This means that
+&lt;sourceDir&gt; will be sorted by device numbers + inode numbers. This means that
 multiply-linked files will be in adjacent records. The AWK program AWKHLINKS
 evaluates this situation: The type of the first link will be kept as "file" (f),
 the types of the other links will be changed to "hardlinks" (h).
 
 Then comes the core function of Zaloha. The CSV metadata files from &lt;sourceDir&gt;
-and &lt;backupDir&gt; will be united and sorted by file path and the Source/Backup
-indicator. This means that objects existing in both directories will be in
+and &lt;backupDir&gt; will be united and sorted by file's paths and the Source/Backup
+indicators. This means that objects existing in both directories will be in
 adjacent records, with the &lt;backupDir&gt; record coming first. The AWK program
 AWKDIFF evaluates this situation (as well as records from objects existing in
 only one of the directories), and writes target state of synchronized
@@ -1086,6 +1086,11 @@ objects to <b>KEEP</b> only in &lt;backupDir&gt;.
 
 The remaining code uses the produced data to perform actual work, and should be
 self-explanatory.
+
+An interactive JavaScript flowchart exists that explains the internal processing
+within Zaloha in a graphical and intuitive manner.
+
+  Interactive JavaScript flowchart: <a href="https://fitus.github.io/flowchart.html">https://fitus.github.io/flowchart.html</a>
 
 Understanding AWKDIFF is the key to understanding of whole Zaloha. An important
 hint to AWKDIFF is that there can be five types of filesystem objects in
@@ -1188,10 +1193,13 @@ to determine where the filenames end in a situation when they contain tabs and
 newlines (it is impossible that filenames produce a field containing /// alone,
 because filenames cannot contain the tab + /// sequence).
 
-An additional challenge is passing of variable values to AWK. During its
-lexical parsing, AWK interprets backslash-led escape sequences. To avoid this,
-backslashes are converted to ///b in the bash script, and ///b are converted
-back to backslashes in the AWK programs.
+With these preparations, see how the AWKCLEANER works: For columns 13 and 15,
+process CSV fields and records until a field containing /// is found. In such
+special processing mode (in AWK code: fpr has value 1), every switch to a new
+CSV field is a tab in the path, and every switch to a new record is a newline
+in the path. AWKCLEANER assembles the fragments contained in the CSV fields
+with the tabs (escaped as ///t) and newlines (escaped as ///n) to build the
+resulting escaped paths that contain neither real tabs nor real newlines.
 
 Zaloha checks that no input parameters contain ///, to avoid breaking of the
 internal escape logic from the outside. The only exception are &lt;findSourceOps&gt;
@@ -1206,6 +1214,11 @@ occur there as well. The solution is the exclusion of such symbolic links from
 the processing, by the FIND expressions -lname *///* -o. Yes, honestly, here we
 hit a limit of how far can be reasonably gone with a shellscript alone. Whether
 such symbolic links are relevant to day-to-day practice is debatable, however.
+
+An additional challenge is passing of variable values to AWK. During its
+lexical parsing, AWK interprets backslash-led escape sequences. To avoid this,
+backslashes are converted to ///b in the bash script, and ///b are converted
+back to backslashes in the AWK programs.
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single
 quotes are disruptors. As a solution, the '"'"' quoting technique is used.
