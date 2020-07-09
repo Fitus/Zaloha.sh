@@ -10,8 +10,10 @@ Zaloha is a small and simple directory synchronizer:
    flash drive, mounted Samba or NFS volume).
  * Zaloha does not lock files while copying them. No writing on either directory
    may occur while Zaloha runs.
- * Zaloha always copies whole files (not parts of files like RSYNC). This is,
-   however, fully sufficient in many situations.
+ * Zaloha always copies whole files via the operating system's CP command
+   (= no delta-transfer like in RSYNC).
+ * Zaloha is not memory-constrained (metadata is processed as CSV files,
+   no limit for huge directory trees).
  * Zaloha has optional reverse-synchronization features (details below).
  * Zaloha can optionally compare files byte by byte (details below).
  * Zaloha prepares scripts for case of eventual restore (details below).
@@ -575,7 +577,7 @@ excluded by &lt;findSourceOps&gt; and files exist in &lt;backupDir&gt; under sam
 then Zaloha evaluates the files in &lt;backupDir&gt; as obsolete (= removes them,
 unless the <b>--noRemove</b> option is given, or eventually even attempts to
 reverse-synchronize them (which leads to one of the corner cases
-(see the Corner Cases section)).
+(see the Corner Cases section))).
 
 On the contrary, the files excluded by &lt;findGeneralOps&gt; are not visible to
 Zaloha at all, neither in &lt;sourceDir&gt; nor in &lt;backupDir&gt;, so Zaloha will not
@@ -617,7 +619,7 @@ Further, the internal logic of Zaloha imposes the following limitations:
    itself, it will prepare commands to create the contents of the subdirectory,
    but they will fail as the command to create the subdirectory itself (mkdir)
    will not be prepared. Example: exclude all subdirectories owned by user fred
-   including all their contents:
+   and all their contents:
 
     --findSourceOps='( -type d -a -user fred ) -prune -o'
 
@@ -679,7 +681,7 @@ Your shell might interpret certain special characters contained on the command
 line. Should these characters be passed to the called program (= Zaloha)
 uninterpreted, they must be quoted or escaped.
 
-The bash shell does not interpret any characters in strings quoted by single
+The BASH shell does not interpret any characters in strings quoted by single
 quotes. In strings quoted by double-quotes, the situation is more complex.
 
 Please see the respective shell documentation for more details.
@@ -697,7 +699,7 @@ However, if a FIND operand contains spaces, it must be enclosed in double-quotes
 double-quotes themselves, then it too must be enclosed in double-quotes (")
 and the original double-quotes must be escaped by second double-quotes ("").
 
-Examples (for bash for both single-quoted and double-quoted strings):
+Examples (for BASH for both single-quoted and double-quoted strings):
 
   * exclude all objects named Windows Security
   * exclude all objects named My "Secret" Things
@@ -716,7 +718,7 @@ following characters specially (see FIND documentation): *, ?, [, ], \.
 If these characters are to be taken literally, they must be handed over to
 FIND backslash-escaped.
 
-Examples (for bash for both single-quoted and double-quoted strings):
+Examples (for BASH for both single-quoted and double-quoted strings):
 
   * exclude all objects whose names begin with abcd (i.e. FIND pattern abcd*)
   * exclude all objects named exactly mnop* (literally including the asterisk)
@@ -845,8 +847,8 @@ reality symbolic links, "rm -f" removes the symbolic links themselves, not the
 referenced objects, and "rmdir" fails altogether.
 
 Corner case loops: Loops can occur if symbolic links are in play. Zaloha can
-only rely on the FIND commands to handle them (and prevent running forever).
-GNU find, for example, contains an internal mechanism to detect loops.
+only rely on the FIND commands to handle them (= prevent running forever).
+GNU find, for example, contains an internal mechanism to handle loops.
 
 Technical note for the case when the start point directories themselves are
 symbolic links: Zaloha passes all start point directories to FIND with trailing
@@ -859,7 +861,7 @@ slashes, which instructs FIND to follow them if they are symbolic links.
 <pre>
 First, test Zaloha on a small and noncritical set of your data. Although Zaloha
 has been tested on several environments, it can happen that Zaloha malfunctions
-on your environment due to different behavior of the operating system, bash,
+on your environment due to different behavior of the operating system, BASH,
 FIND, SORT, AWK and other utilities. Perform tests in the interactive regime
 first. If Zaloha prepares wrong actions, abort it at the next prompt.
 
@@ -965,7 +967,7 @@ both &lt;sourceDir&gt; and &lt;backupDir&gt;, and in &lt;sourceDir&gt; the files
 &lt;findSourceOps&gt; and in &lt;backupDir&gt; the corresponding files are newer than the
 last run of Zaloha, the <b>REV.NEW</b> actions prepared by Zaloha are wrong. This is
 an error which Zaloha is unable to detect. Hence, the shellscript for Exec3
-contains a test that throws an error in such situations.
+contains a test that throws errors in such situations.
 
 Corner case <b>REV.UP</b> with <b>--ok3600s:</b> The <b>--ok3600s</b> option makes it harder
 to determine which file is newer (decision <b>UPDATE</b> vs <b>REV.UP</b>). The implemented
@@ -1211,13 +1213,15 @@ consecutive slashes while writing them to the filesystems, and FIND does not
 normalize them either in the -printf %l output. Actually, there seem to be no
 constraints on the target paths of symbolic links. Hence, the /// triplets can
 occur there as well. The solution is the exclusion of such symbolic links from
-the processing, by the FIND expressions -lname *///* -o. Yes, honestly, here we
-hit a limit of how far can be reasonably gone with a shellscript alone. Whether
-such symbolic links are relevant to day-to-day practice is debatable, however.
+the processing, by the FIND expressions -lname *///* -o. This "just" removes the
+security vulnerability arising from such symbolic links, but does not introduce
+their proper processing. A proper processing is theoretically possible, but the
+costs (extra FIND's and program code) would be hardly justifiable in light of
+the debatable practical relevance of such symbolic links.
 
 An additional challenge is passing of variable values to AWK. During its
 lexical parsing, AWK interprets backslash-led escape sequences. To avoid this,
-backslashes are converted to ///b in the bash script, and ///b are converted
+backslashes are converted to ///b in the BASH script, and ///b are converted
 back to backslashes in the AWK programs.
 
 In the shellscripts produced by Zaloha, single quoting is used, hence single
@@ -1335,8 +1339,8 @@ the directories must run last, of course, not first.
 
 <pre>
 First, let's make it clear that comparing contents of files will increase the
-runtime dramatically, because instead of reading just the directory data to
-obtain file sizes and modification times, the files themselves must be read.
+runtime dramatically, because instead of reading just the directory data,
+the files themselves must be read.
 
 ALTERNATIVE 1: option <b>--byteByByte</b> (suitable if both filesystems are local)
 
@@ -1364,7 +1368,7 @@ of CSV metadata files 310 and 320 with column 4 overloaded as described.
 <pre>
 Standard security practices should be followed on environments exposed to
 potential attackers: Potential attackers should not be allowed to modify the
-command line that invokes Zaloha, the PATH variable, bash init scripts or other
+command line that invokes Zaloha, the PATH variable, BASH init scripts or other
 items that may influence how Zaloha works and invokes operating system commands.
 
 Further, the following security threats arise from backup of a directory that is
