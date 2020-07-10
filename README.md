@@ -27,7 +27,7 @@ On Linux/Unics, Zaloha runs natively. On Windows, Cygwin is needed.
 ### Explained in five sentences
 
  * FIND is executed to scan both directories to obtain CSV metadata about files and subdirectories.
- * The CSV metadata is compared by a sequence of sorts and sequential AWK processing steps.
+ * The CSV metadata is compared by a sequence of sorts and AWK processing steps.
  * The results (= prepared synchronization actions) are presented to the user for confirmation.
  * If the user confirms, the synchronization actions are executed.
  * A non-interactive regime is available as well.
@@ -70,8 +70,8 @@ Performance was measured on following system and data:
  * Zaloha options: --noRestore YES, --mawk YES, --hLinks NO, --byteByByte NO
 
 Measured performance of the analysis phase:
- * first run: 25 seconds (filesystem data not cached in the OS: the FIND's are slow)
- * second run: 5 seconds (filesystem data cached in the OS: the FIND's are fast)
+ * first run: 25 seconds (filesystem data not cached in the OS: the FIND scans are slow)
+ * second run: 5 seconds (filesystem data cached in the OS: the FIND scans are fast)
 
 Performance of the execution phase:
  * depends on how many files need synchronization: zero to several minutes
