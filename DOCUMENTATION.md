@@ -12,8 +12,8 @@ Zaloha is a small and simple directory synchronizer:
    may occur while Zaloha runs.
  * Zaloha always copies whole files via the operating system's CP command
    (= no delta-transfer like in RSYNC).
- * Zaloha is not memory-constrained (metadata is processed as CSV files,
-   no limit for huge directory trees).
+ * Zaloha is not limited by memory (metadata is processed as CSV files,
+   no limits for huge directory trees).
  * Zaloha has optional reverse-synchronization features (details below).
  * Zaloha can optionally compare files byte by byte (details below).
  * Zaloha prepares scripts for case of eventual restore (details below).
@@ -244,6 +244,12 @@ If reverse-synchronization is not active: If no <b>--revNew</b> option is given,
 then each standalone file in &lt;backupDir&gt; is considered obsolete (and removed,
 unless the <b>--noRemove</b> option is given). If no <b>--revUp</b> option is given, then
 files in &lt;sourceDir&gt; always update files in &lt;backupDir&gt; if they differ.
+
+Please note that the reverse-synchronization is NOT a full bi-directional
+synchronization where &lt;sourceDir&gt; and &lt;backupDir&gt; would be equivalent.
+Especially, there is no <b>REV.REMOVE</b> action. It was a conscious decision to not
+implement it, as any removals from &lt;sourceDir&gt; would introduce not acceptable
+risks.
 
 Reverse-synchronization to &lt;sourceDir&gt; increases the overall complexity of the
 solution. Use it only in the interactive regime of Zaloha, where human oversight
@@ -1016,7 +1022,9 @@ Corner case if directory .Zaloha_metadata exists under &lt;sourceDir&gt; as well
 (e.g. in case of backups of backups): It will be ignored. If a backup of that
 directory is needed as well, it should be solved separately (Hint: if the
 secondary backup starts one directory higher, then .Zaloha_metadata of the
-original backup will be taken).
+original backup will be taken). Why be concerned about backups of
+.Zaloha_metadata: be reminded that Zaloha synchronizes to &lt;backupDir&gt; only
+files and directories and keeps other objects in metadata only.
 
 Corner case FAT uppercase conversions: The widespread FAT filesystem has been
 already mentioned as a source of challenges. Here is another one: The source

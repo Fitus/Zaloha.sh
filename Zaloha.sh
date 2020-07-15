@@ -41,8 +41,8 @@ Zaloha is a small and simple directory synchronizer:
    may occur while Zaloha runs.
  * Zaloha always copies whole files via the operating system's CP command
    (= no delta-transfer like in RSYNC).
- * Zaloha is not memory-constrained (metadata is processed as CSV files,
-   no limit for huge directory trees).
+ * Zaloha is not limited by memory (metadata is processed as CSV files,
+   no limits for huge directory trees).
  * Zaloha has optional reverse-synchronization features (details below).
  * Zaloha can optionally compare files byte by byte (details below).
  * Zaloha prepares scripts for case of eventual restore (details below).
@@ -271,6 +271,12 @@ If reverse-synchronization is not active: If no "--revNew" option is given,
 then each standalone file in <backupDir> is considered obsolete (and removed,
 unless the "--noRemove" option is given). If no "--revUp" option is given, then
 files in <sourceDir> always update files in <backupDir> if they differ.
+
+Please note that the reverse-synchronization is NOT a full bi-directional
+synchronization where <sourceDir> and <backupDir> would be equivalent.
+Especially, there is no REV.REMOVE action. It was a conscious decision to not
+implement it, as any removals from <sourceDir> would introduce not acceptable
+risks.
 
 Reverse-synchronization to <sourceDir> increases the overall complexity of the
 solution. Use it only in the interactive regime of Zaloha, where human oversight
@@ -1038,7 +1044,9 @@ Corner case if directory .Zaloha_metadata exists under <sourceDir> as well
 (e.g. in case of backups of backups): It will be ignored. If a backup of that
 directory is needed as well, it should be solved separately (Hint: if the
 secondary backup starts one directory higher, then .Zaloha_metadata of the
-original backup will be taken).
+original backup will be taken). Why be concerned about backups of
+.Zaloha_metadata: be reminded that Zaloha synchronizes to <backupDir> only
+files and directories and keeps other objects in metadata only.
 
 Corner case FAT uppercase conversions: The widespread FAT filesystem has been
 already mentioned as a source of challenges. Here is another one: The source

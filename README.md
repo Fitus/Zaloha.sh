@@ -9,7 +9,7 @@ Zaloha is a small and simple directory synchronizer:
  * Both directories must be available locally (local HDD/SSD, flash drive, mounted Samba or NFS volume).
  * Zaloha does not lock files while copying them. No writing on either directory may occur while Zaloha runs.
  * Zaloha always copies whole files via the operating system's CP command (= no delta-transfer like in RSYNC).
- * Zaloha is not memory-constrained (metadata is processed as CSV files, no limit for huge directory trees).
+ * Zaloha is not limited by memory (metadata is processed as CSV files, no limits for huge directory trees).
  * Zaloha has optional reverse-synchronization features.
  * Zaloha can optionally compare files byte by byte.
  * Zaloha prepares scripts for case of eventual restore.
@@ -70,8 +70,8 @@ Performance was measured on following system and data:
  * Zaloha options: --noRestore YES, --mawk YES, --hLinks NO, --byteByByte NO
 
 Measured performance of the analysis phase:
- * first run: 25 seconds (filesystem data not cached in the OS: the FIND scans are slow)
- * second run: 5 seconds (filesystem data cached in the OS: the FIND scans are fast)
+ * first run: 25 seconds (filesystem data not cached in the OS: the FINDs 2 x 12 secs, the sorts and AWKs 1 sec)
+ * second run: 5 seconds (filesystem data cached in the OS: the FINDs 2 x 2 secs, the sorts and AWKs 1 sec)
 
 Performance of the execution phase:
  * depends on how many files need synchronization: zero to several minutes
