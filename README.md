@@ -13,6 +13,9 @@ Zaloha is a small and simple directory synchronizer:
  * Zaloha has optional reverse-synchronization features.
  * Zaloha can optionally compare files byte by byte.
  * Zaloha prepares scripts for case of eventual restore.
+ * :octocat: :octocat: :octocat: ***[Zaloha2.sh](https://github.com/Fitus/Zaloha2.sh) - new version with following new features has been released:***
+ * *Optional backup to a remote backup host via SSH/SCP.*
+ * *Optional comparing contents of files via SHA-256 hashes.*
 
 Full documentation is available both [online](DOCUMENTATION.md) as well as inside of Zaloha.sh.
 
