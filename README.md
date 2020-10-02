@@ -15,6 +15,7 @@ Zaloha is a small and simple directory synchronizer:
  * Zaloha prepares scripts for case of eventual restore.
  * :octocat: :octocat: :octocat: ***[Zaloha2.sh](https://github.com/Fitus/Zaloha2.sh) - new version with following new features has been released:***
  * *Optional backup to a remote backup host via SSH/SCP.*
+ * *Optional backup from a remote source host via SSH/SCP.*
  * *Optional comparing contents of files via SHA-256 hashes.*
 
 Full documentation is available both [online](DOCUMENTATION.md) as well as inside of Zaloha.sh.
@@ -50,10 +51,60 @@ From the downloaded ZIP archive, extract Zaloha.sh and make it executable (<b>ch
 
 For running the Simple Demo, extract also the scripts Simple_Demo_step1/2/3/4/5/6/7.sh and make them executable.
 
-## Usage Example
+## Usage Examples
+
+Basic usage: Synchronize <code>test_source</code> to <code>test_backup</code>:
 
 ```bash
-Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" [other options, see docu]
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup"
+```
+
+Basic usage with colors (on terminals with ANSI escape codes):
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --color
+```
+
+If files in <code>test_backup</code> are newer (younger) than the corresponding files in <code>test_source</code>,
+copy them back to <code>test_source</code> (reverse-update):
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --revUp
+```
+
+If there are files in <code>test_backup</code> that do not exist in <code>test_source</code>,
+and those files are newer (younger) than the last run of Zaloha,
+copy them back to <code>test_source</code> (reverse-new):
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --revNew
+```
+
+Exclude directories <code>.git</code> from synchronization. If such directories already exist in <code>test_backup</code>, remove them:
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
+          --findSourceOps='( -type d -a -name .git ) -prune -o'
+```
+
+Exclude files with ending <code>.NFO</code> from synchronization. If such files already exist in <code>test_backup</code>, remove them:
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
+          --findSourceOps='( -type f -a -name *.NFO ) -o'
+```
+
+Exclude files with ending <code>.NFO</code> from synchronization generally (never do anything with them):
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
+          --findGeneralOps='+( -type f -a -name *.NFO ) -o'
+```
+
+Compare files byte-by-byte instead of by just their sizes and modification times (warning: this might take much time):
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --byteByByte
 ```
 
 ## Usage Screenshot
