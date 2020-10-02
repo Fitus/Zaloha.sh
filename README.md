@@ -53,58 +53,94 @@ For running the Simple Demo, extract also the scripts Simple_Demo_step1/2/3/4/5/
 
 ## Usage Examples
 
-Basic usage: Synchronize <code>test_source</code> to <code>test_backup</code>:
+**Basic Usage**: Synchronize <code>test_source</code> to <code>test_backup</code>:
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup"
 ```
 
-Basic usage with colors (on terminals with ANSI escape codes):
+Basic usage with **Colors** (on terminals with ANSI escape codes):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --color
 ```
 
-If files in <code>test_backup</code> are newer (younger) than the corresponding files in <code>test_source</code>,
-copy them back to <code>test_source</code> (reverse-update):
+Besides the standard synchronization,
+if there are files in <code>test_backup</code> that are newer (younger) than the corresponding files in <code>test_source</code>,
+copy them back to <code>test_source</code> (**Reverse-Update**):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --revUp
 ```
 
-If there are files in <code>test_backup</code> that do not exist in <code>test_source</code>,
+Besides the standard synchronization,
+if there are files in <code>test_backup</code> that do not exist in <code>test_source</code>,
 and those files are newer (younger) than the last run of Zaloha,
-copy them back to <code>test_source</code> (reverse-new):
+copy them back to <code>test_source</code> (**Reverse-New**):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --revNew
 ```
 
-Exclude directories <code>.git</code> from synchronization. If such directories already exist in <code>test_backup</code>, remove them:
+Do not remove objects that exist only in <code>test_backup</code> (unless they collide with new objects in <code>test_source</code>).
+Simply said: If possible, **Do Not Remove** from <code>test_backup</code>, just add:
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noRemove
+```
+
+**Exclude directories** <code>.git</code> from the synchronization.
+If such directories already exist in <code>test_backup</code>, they are considered obsolete (= removals are prepared):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
           --findSourceOps='( -type d -a -name .git ) -prune -o'
 ```
 
-Exclude files with ending <code>.NFO</code> from synchronization. If such files already exist in <code>test_backup</code>, remove them:
+**Exclude files** with ending <code>.NFO</code> from the synchronization.
+If such files already exist in <code>test_backup</code>, they are considered obsolete (= removals are prepared):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
           --findSourceOps='( -type f -a -name *.NFO ) -o'
 ```
 
-Exclude files with ending <code>.NFO</code> from synchronization generally (never do anything with them):
+**Generally Exclude files** with ending <code>.NFO</code> from the synchronization (never do anything with them:
+note that <code>--findGeneralOps</code> is used instead of <code>--findSourceOps</code>):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
           --findGeneralOps='+( -type f -a -name *.NFO ) -o'
 ```
 
-Compare files byte-by-byte instead of by just their sizes and modification times (warning: this might take much time):
+Compare files **Byte-By-Byte** instead of by just their sizes and modification times (warning: this might take much time):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --byteByByte
+```
+
+Do not prepare scripts for the case of restore (**No Restore**, saves procesing time and disk space):
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noRestore
+```
+
+Instead of GNU AWK, use **MAWK**, the very fast AWK implementation based on a bytecode interpreter:
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --mawk
+```
+
+Produce less screen output (**No Progress Messages**):
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noProgress
+```
+
+**Do Not Execute** the actions (just prepare the scripts):
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noExec
 ```
 
 ## Usage Screenshot
