@@ -137,7 +137,7 @@ Produce less screen output (**No Progress Messages**):
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noProgress
 ```
 
-**Do Not Execute** the actions (just prepare the scripts):
+**Do Not Execute** the actions (just prepare the scripts, see the [Documentation](DOCUMENTATION.md) for more details):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noExec
