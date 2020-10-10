@@ -82,8 +82,8 @@ copy them back to <code>test_source</code> (**Reverse-New**):
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --revNew
 ```
 
-Do not remove objects that exist only in <code>test_backup</code> (unless they collide with new objects in <code>test_source</code>).
-Simply said: If possible, **Do Not Remove** from <code>test_backup</code>, just add:
+Do not remove objects that exist only in <code>test_backup</code> (unless they prevent synchronization of new objects in <code>test_source</code>).
+Simply said: If possible, **Do Not Remove** objects from <code>test_backup</code>, just add new objects/files (or update existing files):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noRemove
@@ -119,7 +119,7 @@ Compare files **Byte-By-Byte** instead of by just their sizes and modification t
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --byteByByte
 ```
 
-Do not prepare scripts for the case of restore (**No Restore**, saves procesing time and disk space):
+Do not prepare scripts for the case of restore (**No Restore**, saves processing time and disk space):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noRestore
