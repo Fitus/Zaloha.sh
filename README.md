@@ -82,8 +82,8 @@ copy them back to <code>test_source</code> (**Reverse-New**):
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --revNew
 ```
 
-Do not remove objects that exist only in <code>test_backup</code> (unless they prevent synchronization of new objects in <code>test_source</code>).
-Simply said: If possible, **Do Not Remove** objects from <code>test_backup</code>, just add new objects/files (or update existing files):
+**Do Not Remove** objects from <code>test_backup</code> (unless the removals are unavoidable),
+just add new files and directories to <code>test_backup</code> (and/or update existing files in there):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noRemove
@@ -106,11 +106,19 @@ Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
 ```
 
 **Generally Exclude files** with ending <code>.NFO</code> from the synchronization (never do anything with them:
-note that <code>--findGeneralOps</code> is used instead of <code>--findSourceOps</code>):
+note that the option <code>--findGeneralOps</code> is used instead of <code>--findSourceOps</code>):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
           --findGeneralOps='+( -type f -a -name *.NFO ) -o'
+```
+
+**Disable the default FIND expressions** that exclude the well-known Linux and Windows "trash" directories
+(use the option <code>--findGeneralOps</code> without the leading <code>+</code> sign).
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
+          --findGeneralOps=
 ```
 
 Compare files **Byte-By-Byte** instead of by just their sizes and modification times (warning: this might take much time):
@@ -172,6 +180,8 @@ Performance of the execution phase:
  * Zaloha successfully passes all my test cases.
  * Eventual (conclusive) Problem Reports are welcome (via Issues).
  * Enhancement Requests so far they won't contradict the "small and simple synchronizer" idea (= no program code inflation, no new processing steps, no increase in runtime etc).
+ * [Zaloha2.sh](https://github.com/Fitus/Zaloha2.sh) extends Zaloha to network operations (over SSH/SCP).
+ * For new deployments use [Zaloha2.sh](https://github.com/Fitus/Zaloha2.sh).
 
 ## Add-on script Zaloha_Snapshot.sh
 
