@@ -114,7 +114,7 @@ Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
 ```
 
 **Disable the default FIND expressions** that exclude the well-known Linux and Windows "trash" directories
-(use the option <code>--findGeneralOps</code> without the leading <code>+</code> sign).
+(use the option <code>--findGeneralOps</code> without the leading <code>+</code> sign):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
@@ -139,7 +139,7 @@ Instead of GNU AWK, use **MAWK**, the very fast AWK implementation based on a by
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --mawk
 ```
 
-Produce less screen output (**No Progress Messages**):
+Produce less screen output (**No Progress Messages** from the analysis phase):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" --noProgress
