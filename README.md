@@ -17,6 +17,8 @@ Zaloha is a small and simple directory synchronizer:
  * *Optional backup to a remote backup host via SSH/SCP.*
  * *Optional backup from a remote source host via SSH/SCP.*
  * *Optional comparing contents of files via SHA-256 hashes.*
+ * *Zaloha2.sh contains other improvements of design, program code and documentation and is recommended for new deployments.*
+ * *The command-line usage of Zaloha2.sh is the same as of Zaloha.sh (except for some (documented) differences in less frequent options).*
 
 Full documentation is available both [online](DOCUMENTATION.md) as well as inside of Zaloha.sh.
 
@@ -105,20 +107,44 @@ Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
           --findSourceOps='( -type f -a -name *.NFO ) -o'
 ```
 
-**Generally Exclude files** with ending <code>.NFO</code> from the synchronization (never do anything with them:
-note that the option <code>--findGeneralOps</code> is used instead of <code>--findSourceOps</code>):
+**Generally Exclude files** with ending <code>.NFO</code> from the synchronization (never do anything with them).
+Note that the option <code>--findGeneralOps</code> is used instead of <code>--findSourceOps</code>.
+The <code>+</code> sign tells Zaloha to use the passed FIND expression *in addition* to the internally defined defaults:
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
           --findGeneralOps='+( -type f -a -name *.NFO ) -o'
 ```
 
-**Disable the default FIND expressions** that exclude the well-known Linux and Windows "trash" directories
-(use the option <code>--findGeneralOps</code> without the leading <code>+</code> sign):
+**Disable the internally defined defaults** for <code>--findGeneralOps</code> that exclude the well-known Linux and Windows
+"trash" and "lost+found" directories. Use the option <code>--findGeneralOps</code> without the leading <code>+</code> sign
+to *replace* the internally defined defaults (here by an empty string):
 
 ```bash
 Zaloha.sh --sourceDir="test_source" --backupDir="test_backup" \
           --findGeneralOps=
+```
+
+**A more complex example with several FIND expressions:** Do not backup any subdirectories <code>.git</code>,
+<code>.svn</code> and <code>.cache</code> in <code>test_source</code>.
+If they already exist in <code>test_backup</code>, prepare their removals.
+These are also clear cases for <code>--findSourceOps</code>. Further, completely ignore (in both directories)
+any coredump files and the subdirectories <code>mount</code> and <code>database</code> located directly under <code>test_source</code>
+and <code>test_backup</code>. The reasons are that arbitrary external media can be mounted under <code>mount</code> and
+the backup of <code>database</code> is implemented by dedicated tools provided by the database vendor (also not on file level).
+These are again clear cases for <code>--findGeneralOps</code>. Additionally, preserve the internally defined defaults
+for <code>--findGeneralOps</code> (this is achieved by the leading <code>+</code> sign).
+Finally, for a good visual appearance, use the expression by expression method:
+
+```bash
+Zaloha.sh --sourceDir="test_source" --backupDir="test_backup"       \
+          --findSourceOps='( -type d -a -name .git ) -prune -o'     \
+          --findSourceOps='( -type d -a -name .svn ) -prune -o'     \
+          --findSourceOps='( -type d -a -name .cache ) -prune -o'   \
+          --findGeneralOps='+'                                      \
+          --findGeneralOps='( -type f -a -name core ) -o'           \
+          --findGeneralOps='-path ///d/mount -prune -o'             \
+          --findGeneralOps='-path ///d/database -prune -o'
 ```
 
 Compare files **Byte-By-Byte** instead of by just their sizes and modification times (warning: this might take much time):
